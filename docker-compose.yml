@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # Next.js application (development)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    depends_on:
+      - redis
+      - parsing-service
+    volumes:
+      - ./src:/app/src
+      - ./messages:/app/messages
+      - ./public:/app/public
+
+  # Python parsing microservice
+  parsing-service:
+    build:
+      context: ./parsing-service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - TIKA_SERVER_JAR=https://repo1.maven.org/maven2/org/apache/tika/tika-server-standard/2.9.1/tika-server-standard-2.9.1.jar
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # BullMQ workers
+  workers:
+    build:
+      context: .
+      dockerfile: Dockerfile.workers
+    env_file:
+      - .env.local
+    environment:
+      - PARSING_SERVICE_URL=http://parsing-service:8000
+    depends_on:
+      - redis
+      - parsing-service
+
+  # Redis for BullMQ
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  redis-data:

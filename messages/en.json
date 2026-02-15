@@ -1,0 +1,306 @@
+{
+  "common": {
+    "appName": "DocFides",
+    "tagline": "AI-assisted project documentation",
+    "getStarted": "Get Started",
+    "signIn": "Sign In",
+    "signUp": "Sign Up",
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "export": "Export",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "back": "Back",
+    "next": "Next",
+    "confirm": "Confirm",
+    "close": "Close",
+    "search": "Search",
+    "noResults": "No results found",
+    "upload": "Upload",
+    "download": "Download",
+    "processing": "Processing...",
+    "ready": "Ready",
+    "draft": "Draft"
+  },
+  "landing": {
+    "hero": {
+      "title": "Transform source documents into complete documentation",
+      "subtitle": "Upload your sources, let AI extract, map, and write. Review, edit, export. Done.",
+      "cta": "Start Free",
+      "secondaryCta": "See How It Works",
+      "badges": {
+        "ocr": "OCR & table extraction",
+        "languages": "50+ languages",
+        "gdpr": "GDPR safe"
+      }
+    },
+    "howItWorks": {
+      "title": "How It Works",
+      "subtitle": "Four simple steps from source documents to polished output",
+      "steps": {
+        "upload": {
+          "title": "Upload Documents",
+          "description": "Sources, templates, model examples"
+        },
+        "process": {
+          "title": "AI Processes",
+          "description": "6 AI agents extract, map, and write"
+        },
+        "review": {
+          "title": "Review & Edit",
+          "description": "Split-screen editor with accept/edit/skip"
+        },
+        "export": {
+          "title": "Export",
+          "description": "One click, preserving all formatting"
+        }
+      }
+    },
+    "features": {
+      "title": "Features",
+      "subtitle": "Everything you need for professional documentation",
+      "items": {
+        "aiPipeline": {
+          "title": "6-Agent AI Pipeline",
+          "description": "Extract, analyze, map, write, verify — each step handled by a specialized AI agent"
+        },
+        "ocr": {
+          "title": "Advanced OCR",
+          "description": "Extract text from scans, photos, and complex tables with confidence scoring"
+        },
+        "entityDetection": {
+          "title": "Entity Detection",
+          "description": "Automatically identifies beneficiaries, contractors, and subcontractors from your documents"
+        },
+        "styleMatching": {
+          "title": "Style Matching",
+          "description": "AI learns tone, vocabulary, and structure from your model documents"
+        },
+        "verification": {
+          "title": "AI Verification",
+          "description": "Cross-checks all data for accuracy, consistency, and completeness"
+        },
+        "export": {
+          "title": "DOCX & PDF Export",
+          "description": "Dynamic tables, conditional sections, header/footer data — all formatted correctly"
+        }
+      }
+    },
+    "parsing": {
+      "title": "Best-in-Class Document Parsing",
+      "subtitle": "From crumpled scans to structured data",
+      "badges": {
+        "tesseract": "Tesseract 5 OCR",
+        "tables": "Table Detection",
+        "deskew": "Auto Deskew",
+        "languages": "80+ Languages"
+      }
+    },
+    "pricing": {
+      "title": "Pricing",
+      "subtitle": "Choose the plan that fits your workload",
+      "free": {
+        "name": "Free",
+        "price": "0",
+        "currency": "RON",
+        "period": "month",
+        "features": {
+          "docs": "3 documents/month",
+          "storage": "100MB storage",
+          "support": "Community support"
+        },
+        "cta": "Start Free"
+      },
+      "professional": {
+        "name": "Professional",
+        "price": "99",
+        "currency": "RON",
+        "period": "month",
+        "features": {
+          "docs": "50 documents/month",
+          "storage": "5GB storage",
+          "support": "Priority support",
+          "models": "Model document analysis"
+        },
+        "cta": "Subscribe",
+        "popular": "Most Popular"
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "Custom",
+        "currency": "",
+        "period": "",
+        "features": {
+          "docs": "Unlimited documents",
+          "storage": "Unlimited storage",
+          "support": "Dedicated support",
+          "sso": "SSO & audit logs"
+        },
+        "cta": "Contact Us"
+      }
+    },
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "items": {
+        "whatIs": {
+          "question": "What is DocFides?",
+          "answer": "DocFides is an AI-powered platform that automates project documentation completion. You upload source documents, an optional style reference, and a template — and our AI pipeline extracts data, maps it to fields, and generates professional text."
+        },
+        "security": {
+          "question": "Is my data secure?",
+          "answer": "Yes. Files are stored temporarily (24-hour auto-delete), processed in isolated pipelines, and never used for AI training. All transfers use encrypted connections."
+        },
+        "languages": {
+          "question": "What languages are supported?",
+          "answer": "The OCR engine supports 80+ languages. The AI writing pipeline works best with Romanian and English documentation, with full support for Romanian diacritics and domain terminology."
+        },
+        "formats": {
+          "question": "What file formats can I upload?",
+          "answer": "We accept PDF (native and scanned), DOCX, XLSX, XLS, PNG, JPG, and TIFF. Maximum file size is 25MB."
+        },
+        "accuracy": {
+          "question": "How accurate is the AI?",
+          "answer": "Each extracted field gets a confidence score. Fields above 90% are auto-accepted, while lower-confidence fields are flagged for your review. The verification agent cross-checks all data before export."
+        }
+      }
+    },
+    "cta": {
+      "title": "Ready to transform your documentation workflow?",
+      "subtitle": "Start for free. No credit card required.",
+      "button": "Get Started Now"
+    }
+  },
+  "nav": {
+    "howItWorks": "How It Works",
+    "features": "Features",
+    "pricing": "Pricing",
+    "faq": "FAQ"
+  },
+  "footer": {
+    "product": "Product",
+    "company": "Company",
+    "legal": "Legal",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "about": "About",
+    "contact": "Contact",
+    "blog": "Blog",
+    "copyright": "© {year} DocFides. All rights reserved."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "newProject": "New Project",
+    "noProjects": "No projects yet. Create your first one!",
+    "credits": {
+      "title": "Credits",
+      "used": "{used} / {total} used",
+      "warning": "You've used {percent}% of your credits",
+      "exhausted": "Credits exhausted. Upgrade to continue exporting."
+    },
+    "stats": {
+      "projects": "Projects this month",
+      "costPerDoc": "Avg. cost/document",
+      "timeSaved": "Hours saved",
+      "recentActivity": "Recent Activity"
+    }
+  },
+  "project": {
+    "new": "New Project",
+    "name": "Project Name",
+    "namePlaceholder": "Enter project name...",
+    "create": "Create Project",
+    "status": {
+      "draft": "Draft",
+      "uploading": "Uploading",
+      "processing": "Processing",
+      "ready": "Ready",
+      "exported": "Exported"
+    },
+    "upload": {
+      "title": "Upload Documents",
+      "sourceLabel": "Source Documents",
+      "sourceHint": "Contracts, ID cards, financial records (max 10 files, 25MB each)",
+      "templateLabel": "Template",
+      "templateHint": "The document template to fill",
+      "modelLabel": "Model Document (Optional)",
+      "modelHint": "Style reference only — no factual data will be extracted",
+      "filenameHint": "Tip: Name files descriptively (e.g., CI_beneficiar_Popescu.pdf)",
+      "maxFiles": "Maximum {max} files",
+      "maxSize": "Maximum {max}MB per file",
+      "acceptedFormats": "Accepted: PDF, DOCX, XLSX, XLS, PNG, JPG, TIFF"
+    },
+    "processing": {
+      "title": "AI Processing",
+      "steps": {
+        "extracting": "Extracting data from documents...",
+        "analyzing": "Analyzing style from model document...",
+        "mapping": "Mapping data to template fields...",
+        "writing": "Generating text...",
+        "verifying": "Verifying quality..."
+      },
+      "complete": "Processing complete!",
+      "failed": "Processing failed. Please retry.",
+      "retryButton": "Retry Processing"
+    },
+    "editor": {
+      "title": "Review & Edit",
+      "field": "Field {number}",
+      "accept": "Accept",
+      "edit": "Edit",
+      "regenerate": "Regenerate",
+      "skip": "Skip",
+      "accepted": "Accepted",
+      "skipped": "Skipped",
+      "modified": "Modified",
+      "undoField": "Undo",
+      "undoAll": "Undo All",
+      "confidenceHigh": "High confidence",
+      "confidenceMedium": "Medium confidence — review recommended",
+      "confidenceLow": "Low confidence — manual review required",
+      "multipleSuggestions": "Multiple entities detected — please choose:",
+      "entitySource": "Source: {filename}"
+    },
+    "export": {
+      "title": "Export Document",
+      "docx": "Export DOCX",
+      "pdf": "Export PDF",
+      "credits": "This will use {credits} credit(s)",
+      "downloading": "Preparing download...",
+      "success": "Document exported successfully!"
+    }
+  },
+  "admin": {
+    "title": "Admin Dashboard",
+    "users": {
+      "title": "User Management",
+      "email": "Email",
+      "plan": "Plan",
+      "credits": "Credits",
+      "status": "Status",
+      "actions": "Actions",
+      "enable": "Enable",
+      "disable": "Disable"
+    },
+    "stats": {
+      "title": "Usage Statistics",
+      "totalUsers": "Total Users",
+      "totalProjects": "Total Projects",
+      "totalExports": "Total Exports",
+      "aiCost": "AI Cost (this month)"
+    }
+  },
+  "auth": {
+    "signIn": {
+      "title": "Sign in to DocFides",
+      "subtitle": "Continue with your account"
+    },
+    "signUp": {
+      "title": "Create your DocFides account",
+      "subtitle": "Start automating your documentation"
+    }
+  }
+}
