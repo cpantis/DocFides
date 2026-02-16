@@ -14,6 +14,8 @@ import { processHeadersFooters, type HeaderFooterReplacement } from './header-fo
 export interface DocxGenerationInput {
   templateBuffer: Buffer;
   fieldValues: Record<string, string>;
+  /** Field IDs whose values are Markdown narratives (multi-paragraph, with formatting) */
+  narrativeFields?: Set<string>;
   dynamicTables?: DynamicTableInput[];
   conditionalSections?: ConditionalSectionInput[];
   headerFooterValues?: Record<string, string>;
@@ -53,13 +55,21 @@ export async function generateDocx(input: DocxGenerationInput): Promise<Buffer> 
   }
   let documentXml = await documentFile.async('string');
 
-  // 3. Replace simple field placeholders
+  // 3. Replace field placeholders (simple + narrative)
   if (Object.keys(input.fieldValues).length > 0) {
+    const narrativeIds = input.narrativeFields ?? new Set<string>();
     const replacements: PlaceholderReplacement[] = Object.entries(input.fieldValues).map(
-      ([placeholder, value]) => ({ placeholder, value })
+      ([placeholder, value]) => ({
+        placeholder,
+        value,
+        isNarrative: narrativeIds.has(placeholder),
+      })
     );
+    const narrativeCount = replacements.filter((r) => r.isNarrative).length;
     documentXml = replaceTextPlaceholders(documentXml, replacements);
-    console.log(`[DocGen] Replaced ${replacements.length} field placeholders`);
+    console.log(
+      `[DocGen] Replaced ${replacements.length} field placeholders (${narrativeCount} narrative → Markdown→OOXML)`
+    );
   }
 
   // 4. Process dynamic tables
@@ -123,6 +133,19 @@ export function buildGenerationInput(
   templateSchema: Record<string, unknown>,
   projectData: Record<string, unknown>
 ): DocxGenerationInput {
+  // Build a set of narrative field IDs from templateSchema
+  const narrativeFields = new Set<string>();
+  const allSchemaFields = (templateSchema.fields ?? templateSchema) as Record<string, unknown>[] | undefined;
+  if (Array.isArray(allSchemaFields)) {
+    for (const field of allSchemaFields) {
+      const f = field as Record<string, unknown>;
+      if (f.contentType === 'narrative' || f.contentType === 'conditional') {
+        const id = (f.placeholder ?? f.id ?? '') as string;
+        if (id) narrativeFields.add(id);
+      }
+    }
+  }
+
   // Extract field values (simple placeholder → value map)
   const fieldValues: Record<string, string> = {};
   const completions = (fieldCompletions.fields ?? fieldCompletions) as Record<string, unknown>;
@@ -190,6 +213,7 @@ export function buildGenerationInput(
   return {
     templateBuffer,
     fieldValues,
+    narrativeFields,
     dynamicTables,
     conditionalSections,
     headerFooterValues,

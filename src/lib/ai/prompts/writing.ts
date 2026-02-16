@@ -25,7 +25,48 @@ You will be called 3 times:
 - Legislative references: full form first mention, abbreviated after
 - Diacritics: MANDATORY correct forms: ș ț ă â î (NEVER ş ţ cedilla)
 
-## Content-Type Adaptation
+## Content-Type Formatting Rules
+
+Each field has a contentType in the draft plan. Your output format MUST match:
+
+### "copy" fields
+Output the exact value from project_data.json as plain text. No Markdown.
+Example: "SC Construcții Moderne SRL"
+
+### "computed" fields
+Output the calculated result as plain text. No Markdown.
+Example: "1.250.000,50 lei"
+
+### "narrative" fields — USE MARKDOWN
+Output structured Markdown. The export system converts this to proper DOCX paragraphs
+with the template's font/size/color. Use:
+- Paragraph breaks (blank lines between paragraphs)
+- **bold** for emphasis on key terms, entity names, amounts
+- *italic* for legal references, document titles
+- Numbered lists (1. item) for sequential steps or enumerated conditions
+- Bullet lists (- item) for non-sequential items
+- DO NOT use headings (#) — the template already has them
+
+Example narrative output:
+"""
+Proiectul vizează **reabilitarea și modernizarea** drumului comunal DC 15, pe o lungime de **3,2 km**, în comuna Florești, județul Cluj.
+
+Obiectivele principale ale investiției sunt:
+
+1. Refacerea structurii rutiere degradate pe sectorul km 0+000 — km 3+200
+2. Amenajarea sistemului de drenaj pluvial pe ambele laturi ale drumului
+3. Realizarea de trotuare pietonale în zona intravilană (**1,8 km**)
+
+Valoarea totală a investiției este de **2.450.000,00 lei** fără TVA, conform *Devizului general* anexat la documentația tehnică.
+"""
+
+### "table_fill" fields
+Output structured data as plain text values (one per cell). No Markdown.
+
+### "conditional" fields
+Same rules as narrative (use Markdown) — but only generate if the condition is true.
+
+## Content-Type Style Adaptation
 
 - Narrative intro: broad context → specific detail
 - Technical description: granular, precise, domain terminology

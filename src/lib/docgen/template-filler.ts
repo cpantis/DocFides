@@ -2,17 +2,28 @@
  * DOCX template placeholder replacement.
  * Works at the XML level to handle placeholders split across text runs.
  * Supports patterns: {{field}}, [Field Name], and _____ underline placeholders.
+ *
+ * For narrative fields (Markdown content), replaces the entire containing
+ * paragraph with multiple OOXML paragraphs that inherit the template's style.
  */
+
+import { markdownToOoxml, type NarrativeStyleContext } from './markdown-to-ooxml';
 
 export interface PlaceholderReplacement {
   placeholder: string;
   value: string;
+  /** If true, value is Markdown — converted to multi-paragraph OOXML inheriting template style */
+  isNarrative?: boolean;
 }
 
 /**
  * Replace placeholders in DOCX XML content.
  * Handles the common case where Word splits a placeholder like {{name}}
  * across multiple <w:r> (run) elements, e.g. <w:t>{{</w:t><w:t>name</w:t><w:t>}}</w:t>.
+ *
+ * For narrative replacements (isNarrative=true), the entire containing paragraph
+ * is replaced with multiple OOXML paragraphs generated from Markdown content,
+ * inheriting the template's font, size, color, and paragraph style.
  */
 export function replaceTextPlaceholders(
   xml: string,
@@ -23,13 +34,81 @@ export function replaceTextPlaceholders(
   // First pass: merge split runs so placeholders are in single <w:t> elements
   result = mergeSplitPlaceholders(result);
 
-  // Second pass: do the actual replacements in <w:t> elements
-  for (const { placeholder, value } of replacements) {
+  // Separate narrative replacements from simple ones
+  const narratives = replacements.filter((r) => r.isNarrative);
+  const simple = replacements.filter((r) => !r.isNarrative);
+
+  // Second pass: handle narrative replacements (replace entire paragraphs)
+  for (const { placeholder, value } of narratives) {
+    result = replaceNarrativePlaceholder(result, placeholder, value);
+  }
+
+  // Third pass: do simple text replacements in <w:t> elements
+  for (const { placeholder, value } of simple) {
     const escapedValue = escapeXml(value);
     result = result.replaceAll(placeholder, escapedValue);
   }
 
   return result;
+}
+
+/**
+ * Replace a narrative placeholder by substituting the entire containing paragraph
+ * with Markdown-generated OOXML paragraphs that inherit the template's style.
+ */
+function replaceNarrativePlaceholder(
+  xml: string,
+  placeholder: string,
+  markdownValue: string
+): string {
+  // Find the paragraph containing this placeholder
+  const paragraphRegex = /<w:p[ >][\s\S]*?<\/w:p>/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = paragraphRegex.exec(xml)) !== null) {
+    const paragraph = match[0];
+    if (!paragraph.includes(placeholder)) continue;
+
+    // Extract style context from the template paragraph
+    const styleContext = extractStyleContext(paragraph);
+
+    // Convert Markdown to OOXML paragraphs inheriting the template style
+    const ooxmlParagraphs = markdownToOoxml(markdownValue, styleContext);
+
+    // Replace the entire paragraph with the generated paragraphs
+    xml =
+      xml.substring(0, match.index) +
+      ooxmlParagraphs +
+      xml.substring(match.index + paragraph.length);
+
+    // Only replace first occurrence — each placeholder is unique
+    break;
+  }
+
+  return xml;
+}
+
+/**
+ * Extract run properties (<w:rPr>) and paragraph properties (<w:pPr>)
+ * from a template paragraph to use as style context for generated content.
+ */
+function extractStyleContext(paragraphXml: string): NarrativeStyleContext {
+  const context: NarrativeStyleContext = {};
+
+  // Extract paragraph properties <w:pPr>...</w:pPr>
+  const pPrMatch = /<w:pPr>[\s\S]*?<\/w:pPr>/.exec(paragraphXml);
+  if (pPrMatch) {
+    context.paragraphProperties = pPrMatch[0];
+  }
+
+  // Extract run properties from the first <w:r> that contains the placeholder
+  // This gives us the font, size, color, etc. of the placeholder text
+  const rPrMatch = /<w:rPr>[\s\S]*?<\/w:rPr>/.exec(paragraphXml);
+  if (rPrMatch) {
+    context.runProperties = rPrMatch[0];
+  }
+
+  return context;
 }
 
 /**
