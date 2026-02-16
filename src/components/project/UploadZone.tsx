@@ -1,8 +1,8 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useCallback, useState } from 'react';
-import { Upload, X, FileText, AlertCircle } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
+import { Upload, X, FileText, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import type { DocumentRole } from '@/lib/db/models/document';
 
@@ -15,6 +15,7 @@ interface UploadZoneProps {
 }
 
 interface UploadedFile {
+  id: string;
   file: File;
   status: 'pending' | 'uploading' | 'success' | 'error';
   error?: string;
@@ -23,22 +24,31 @@ interface UploadedFile {
 const ACCEPTED_EXTENSIONS = '.pdf,.docx,.xlsx,.xls,.png,.jpg,.jpeg,.tiff,.tif';
 const MAX_SIZE_MB = 25;
 
+let fileCounter = 0;
+function nextFileId(): string {
+  return `file_${++fileCounter}_${Date.now()}`;
+}
+
 export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadComplete }: UploadZoneProps) {
   const t = useTranslations('project.upload');
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const uploadingRef = useRef(false);
 
   const remainingSlots = maxFiles - existingCount;
 
   const handleFiles = useCallback((fileList: FileList) => {
-    // Only count pending/uploading files toward the limit — success files are already counted in existingCount
     const activeCount = files.filter((f) => f.status === 'pending' || f.status === 'uploading').length;
-    const newFiles = Array.from(fileList).slice(0, remainingSlots - activeCount);
+    const slotsAvailable = remainingSlots - activeCount;
+    if (slotsAvailable <= 0) return;
+
+    const newFiles = Array.from(fileList).slice(0, slotsAvailable);
     const uploadFiles: UploadedFile[] = newFiles.map((file) => {
       if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-        return { file, status: 'error' as const, error: `File too large (max ${MAX_SIZE_MB}MB)` };
+        return { id: nextFileId(), file, status: 'error' as const, error: `File too large (max ${MAX_SIZE_MB}MB)` };
       }
-      return { file, status: 'pending' as const };
+      return { id: nextFileId(), file, status: 'pending' as const };
     });
     setFiles((prev) => [...prev, ...uploadFiles]);
   }, [remainingSlots, files]);
@@ -49,45 +59,61 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
     handleFiles(e.dataTransfer.files);
   }, [handleFiles]);
 
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+  const removeFile = (fileId: string) => {
+    setFiles((prev) => prev.filter((f) => f.id !== fileId));
   };
 
-  const uploadFiles = async () => {
-    const pending = files.filter((f) => f.status === 'pending');
+  const doUpload = async () => {
+    // Guard against double-click
+    if (uploadingRef.current) return;
+    uploadingRef.current = true;
+    setIsUploading(true);
 
-    for (let i = 0; i < pending.length; i++) {
-      const item = pending[i]!;
-      const fileIndex = files.indexOf(item);
+    try {
+      // Snapshot pending files with their IDs
+      const pendingFiles = files.filter((f) => f.status === 'pending');
 
-      setFiles((prev) =>
-        prev.map((f, idx) => idx === fileIndex ? { ...f, status: 'uploading' as const } : f)
-      );
-
-      try {
-        const formData = new FormData();
-        formData.append('file', item.file);
-        formData.append('projectId', projectId);
-        formData.append('role', role);
-
-        const res = await fetch('/api/documents', { method: 'POST', body: formData });
-        if (!res.ok) throw new Error('Upload failed');
-
+      for (const item of pendingFiles) {
+        // Mark as uploading by ID (safe across state changes)
         setFiles((prev) =>
-          prev.map((f, idx) => idx === fileIndex ? { ...f, status: 'success' as const } : f)
+          prev.map((f) => f.id === item.id ? { ...f, status: 'uploading' as const } : f)
         );
-      } catch {
-        setFiles((prev) =>
-          prev.map((f, idx) => idx === fileIndex ? { ...f, status: 'error' as const, error: 'Upload failed' } : f)
-        );
+
+        try {
+          const formData = new FormData();
+          formData.append('file', item.file);
+          formData.append('projectId', projectId);
+          formData.append('role', role);
+
+          const res = await fetch('/api/documents', { method: 'POST', body: formData });
+
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({ error: 'Upload failed' }));
+            throw new Error(data.error || `Upload failed (${res.status})`);
+          }
+
+          setFiles((prev) =>
+            prev.map((f) => f.id === item.id ? { ...f, status: 'success' as const } : f)
+          );
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Upload failed';
+          setFiles((prev) =>
+            prev.map((f) => f.id === item.id ? { ...f, status: 'error' as const, error: message } : f)
+          );
+        }
       }
+
+      onUploadComplete?.();
+
+      // Clear successfully uploaded files from local state
+      setFiles((prev) => prev.filter((f) => f.status !== 'success'));
+    } finally {
+      uploadingRef.current = false;
+      setIsUploading(false);
     }
-
-    onUploadComplete?.();
-
-    // Clear successfully uploaded files from local state to avoid double-counting
-    setFiles((prev) => prev.filter((f) => f.status !== 'success'));
   };
+
+  const hasPending = files.some((f) => f.status === 'pending');
 
   return (
     <div className="space-y-4">
@@ -101,6 +127,7 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
           isDragging ? 'border-primary-400 bg-primary-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
         )}
         onClick={() => {
+          if (isUploading) return;
           const input = document.createElement('input');
           input.type = 'file';
           input.multiple = maxFiles > 1;
@@ -127,9 +154,9 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
       {/* File list */}
       {files.length > 0 && (
         <div className="space-y-2">
-          {files.map((item, index) => (
+          {files.map((item) => (
             <div
-              key={index}
+              key={item.id}
               className={cn(
                 'flex items-center gap-3 rounded-xl border px-4 py-3',
                 item.status === 'error' ? 'border-red-200 bg-red-50' :
@@ -140,6 +167,8 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
             >
               {item.status === 'error' ? (
                 <AlertCircle className="h-4 w-4 flex-shrink-0 text-error" />
+              ) : item.status === 'uploading' ? (
+                <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin text-blue-500" />
               ) : (
                 <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
               )}
@@ -148,7 +177,7 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
                 {(item.file.size / (1024 * 1024)).toFixed(1)} MB
               </span>
               {item.status === 'pending' && (
-                <button onClick={() => removeFile(index)} className="text-gray-400 hover:text-gray-600">
+                <button onClick={() => removeFile(item.id)} className="text-gray-400 hover:text-gray-600">
                   <X className="h-4 w-4" />
                 </button>
               )}
@@ -156,12 +185,13 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
             </div>
           ))}
 
-          {files.some((f) => f.status === 'pending') && (
+          {hasPending && (
             <button
-              onClick={uploadFiles}
-              className="w-full rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
+              onClick={doUpload}
+              disabled={isUploading}
+              className="w-full rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700 disabled:opacity-50"
             >
-              Upload {files.filter((f) => f.status === 'pending').length} file(s)
+              {isUploading ? 'Uploading...' : `Upload ${files.filter((f) => f.status === 'pending').length} file(s)`}
             </button>
           )}
         </div>
