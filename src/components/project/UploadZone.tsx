@@ -31,7 +31,9 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
   const remainingSlots = maxFiles - existingCount;
 
   const handleFiles = useCallback((fileList: FileList) => {
-    const newFiles = Array.from(fileList).slice(0, remainingSlots - files.length);
+    // Only count pending/uploading files toward the limit — success files are already counted in existingCount
+    const activeCount = files.filter((f) => f.status === 'pending' || f.status === 'uploading').length;
+    const newFiles = Array.from(fileList).slice(0, remainingSlots - activeCount);
     const uploadFiles: UploadedFile[] = newFiles.map((file) => {
       if (file.size > MAX_SIZE_MB * 1024 * 1024) {
         return { file, status: 'error' as const, error: `File too large (max ${MAX_SIZE_MB}MB)` };
@@ -39,7 +41,7 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
       return { file, status: 'pending' as const };
     });
     setFiles((prev) => [...prev, ...uploadFiles]);
-  }, [remainingSlots, files.length]);
+  }, [remainingSlots, files]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -82,6 +84,9 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
     }
 
     onUploadComplete?.();
+
+    // Clear successfully uploaded files from local state to avoid double-counting
+    setFiles((prev) => prev.filter((f) => f.status !== 'success'));
   };
 
   return (
