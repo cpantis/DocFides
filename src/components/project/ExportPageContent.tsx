@@ -87,7 +87,6 @@ export function ExportPageContent({ projectId }: ExportPageContentProps) {
                 <p className="text-sm text-gray-500">Microsoft Word format</p>
               </div>
             </div>
-            <p className="mt-4 text-sm text-gray-500">{t('credits', { credits: '1' })}</p>
             <button
               onClick={() => handleExport('docx')}
               disabled={exporting !== null}
@@ -118,7 +117,6 @@ export function ExportPageContent({ projectId }: ExportPageContentProps) {
                 <p className="text-sm text-gray-500">Portable Document Format</p>
               </div>
             </div>
-            <p className="mt-4 text-sm text-gray-500">{t('credits', { credits: '1' })}</p>
             <button
               onClick={() => handleExport('pdf')}
               disabled={exporting !== null}

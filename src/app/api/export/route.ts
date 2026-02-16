@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
-import { connectToDatabase, Project, User, Generation, Audit, DocumentModel } from '@/lib/db';
+import { connectToDatabase, Project, Generation, Audit, DocumentModel } from '@/lib/db';
 import { generateDocx, buildGenerationInput } from '@/lib/docgen/docx-generator';
 import { convertDocxToPdf } from '@/lib/docgen/pdf-converter';
 import { downloadFile } from '@/lib/storage/download';
@@ -21,10 +21,7 @@ export async function POST(req: NextRequest) {
 
     await connectToDatabase();
 
-    const [project, user] = await Promise.all([
-      Project.findOne({ _id: body.projectId, userId }),
-      User.findOne({ clerkId: userId }),
-    ]);
+    const project = await Project.findOne({ _id: body.projectId, userId });
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
@@ -32,16 +29,6 @@ export async function POST(req: NextRequest) {
 
     if (project.status !== 'ready' && project.status !== 'exported') {
       return NextResponse.json({ error: 'Project not ready for export' }, { status: 400 });
-    }
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Check credits
-    const creditsNeeded = 1;
-    if (user.credits.used + creditsNeeded > user.credits.total) {
-      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
     }
 
     // Fetch template document from R2
@@ -99,13 +86,9 @@ export async function POST(req: NextRequest) {
       projectId: body.projectId,
       userId,
       type: body.format,
-      creditsUsed: creditsNeeded,
+      creditsUsed: 0,
       r2Key,
     });
-
-    // Deduct credits
-    user.credits.used += creditsNeeded;
-    await user.save();
 
     await Audit.create({
       userId,
