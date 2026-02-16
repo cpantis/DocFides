@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
 import { connectToDatabase, Project, Audit } from '@/lib/db';
-import { getPipelineQueue } from '@/lib/queue/queues';
+import { runPipelineBackground } from '@/lib/ai/pipeline-runner';
 
 const startPipelineSchema = z.object({
   projectId: z.string().min(1),
@@ -26,22 +26,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Pipeline already running' }, { status: 409 });
     }
 
-    // Queue pipeline job
-    const pipelineQueue = getPipelineQueue();
-    await pipelineQueue.add(
-      `pipeline-${body.projectId}`,
-      {
-        projectId: body.projectId,
-        userId,
-      },
-      {
-        attempts: 1, // Pipeline failures should not auto-retry (user retries manually)
-        jobId: `pipeline-${body.projectId}`, // Prevent duplicate jobs
-      }
-    );
-
-    project.status = 'processing';
-    await project.save();
+    // Run pipeline in the background (fire-and-forget)
+    // This works in dev mode where the server stays alive
+    runPipelineBackground(body.projectId, userId).catch((error) => {
+      console.error('[PIPELINE_BACKGROUND]', error);
+    });
 
     await Audit.create({
       userId,

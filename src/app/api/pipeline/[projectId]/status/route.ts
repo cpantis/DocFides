@@ -12,16 +12,27 @@ export async function GET(
 
     const { projectId } = await params;
     await connectToDatabase();
-    const project = await Project.findOne({ _id: projectId, userId });
+    const project = await Project.findOne({ _id: projectId, userId }).lean();
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
+    const stages = (project.pipelineProgress ?? []) as Array<{
+      stage: string;
+      status: string;
+      startedAt?: Date;
+      completedAt?: Date;
+      error?: string;
+    }>;
+
+    const currentStage = stages.find((s) => s.status === 'running')?.stage ?? null;
+
     return NextResponse.json({
       data: {
         status: project.status,
-        // TODO: include stage details from pipeline job
+        currentStage,
+        stages,
       },
     });
   } catch (error) {

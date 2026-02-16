@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Check, Loader2, Circle } from 'lucide-react';
+import { Check, Loader2, Circle, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 type StageStatus = 'pending' | 'running' | 'completed' | 'failed';
@@ -40,6 +40,8 @@ export function ProcessingProgress({ stages, overallStatus }: ProcessingProgress
                   <Check className="h-4 w-4" />
                 ) : stage.status === 'running' ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
+                ) : stage.status === 'failed' ? (
+                  <XCircle className="h-4 w-4" />
                 ) : (
                   <Circle className="h-3 w-3" />
                 )}

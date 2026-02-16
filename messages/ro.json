@@ -238,6 +238,7 @@
       "steps": {
         "extracting": "Se extrag datele din documente...",
         "analyzing": "Se analizează stilul din documentul model...",
+        "templateAnalysis": "Se analizează câmpurile șablonului...",
         "mapping": "Se mapează datele pe câmpurile șablonului...",
         "writing": "Se generează textul...",
         "verifying": "Se verifică calitatea..."

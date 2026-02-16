@@ -238,6 +238,7 @@
       "steps": {
         "extracting": "Extracting data from documents...",
         "analyzing": "Analyzing style from model document...",
+        "templateAnalysis": "Analyzing template fields...",
         "mapping": "Mapping data to template fields...",
         "writing": "Generating text...",
         "verifying": "Verifying quality..."
