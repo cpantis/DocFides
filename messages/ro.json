@@ -251,7 +251,7 @@
         "goUp": "Folder părinte",
         "goHome": "Folder acasă",
         "emptyFolder": "Acest folder este gol",
-        "pathNotFound": "„{path}" nu a fost găsit — se afișează cel mai apropiat folder existent",
+        "pathNotFound": "{path} nu a fost găsit — se afișează cel mai apropiat folder existent",
         "cancel": "Anulează",
         "selectFolder": "Selectează folderul"
       }
