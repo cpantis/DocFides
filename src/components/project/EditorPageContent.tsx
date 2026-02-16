@@ -154,6 +154,7 @@ export function EditorPageContent({ projectId }: EditorPageContentProps) {
           left={
             previewMode === 'template' ? (
               <TemplatePreview
+                projectId={projectId}
                 projectName={project.name}
                 fields={editor.fields}
                 currentFieldIndex={editor.currentFieldIndex}
@@ -161,6 +162,7 @@ export function EditorPageContent({ projectId }: EditorPageContentProps) {
               />
             ) : (
               <DocumentPreview
+                projectId={projectId}
                 projectName={project.name}
                 fields={editor.fields}
                 currentFieldIndex={editor.currentFieldIndex}
