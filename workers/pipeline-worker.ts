@@ -9,24 +9,76 @@ const connection = {
   url: process.env.REDIS_URL ?? 'redis://localhost:6379',
 };
 
+const PIPELINE_STAGES = ['extractor', 'model', 'template', 'mapping', 'writing', 'verification'] as const;
+
 export const pipelineWorker = new Worker<PipelineJobData>(
   'pipeline',
   async (job: Job<PipelineJobData>) => {
     const { projectId, userId } = job.data;
     console.log(`[Pipeline] Processing project ${projectId} for user ${userId}`);
 
-    const stages = ['extractor', 'model', 'template', 'mapping', 'writing', 'verification'] as const;
+    const { connectToDatabase, Project, DocumentModel, Audit } = await import('../src/lib/db');
+    const { runPipeline } = await import('../src/lib/ai/pipeline');
 
-    for (const stage of stages) {
+    await connectToDatabase();
+
+    const project = await Project.findById(projectId);
+    if (!project) {
+      throw new Error(`Project not found: ${projectId}`);
+    }
+
+    // Check all source documents are extracted before running pipeline
+    const sourceDocs = await DocumentModel.find({
+      projectId,
+      role: 'source',
+      status: { $ne: 'deleted' },
+    });
+
+    const unextracted = sourceDocs.filter((d) => d.status !== 'extracted');
+    if (unextracted.length > 0) {
+      throw new Error(
+        `${unextracted.length} source documents not yet extracted. Wait for OCR to complete.`
+      );
+    }
+
+    // Run the 6-stage AI pipeline
+    for (const stage of PIPELINE_STAGES) {
       await job.updateProgress({ stage, status: 'running' });
       console.log(`[Pipeline] Running ${stage} agent...`);
 
-      // TODO: Call the actual agent implementation
-      // const agent = agents[stage];
-      // const result = await agent.run(projectId);
+      try {
+        await runPipeline(projectId, stage);
+        await job.updateProgress({ stage, status: 'completed' });
+        console.log(`[Pipeline] ${stage} completed`);
+      } catch (error) {
+        console.error(`[Pipeline] ${stage} failed:`, error);
+        await job.updateProgress({ stage, status: 'failed' });
 
-      await job.updateProgress({ stage, status: 'completed' });
+        // Update project status
+        project.status = 'draft'; // Reset so user can retry
+        await project.save();
+
+        await Audit.create({
+          userId,
+          projectId,
+          action: 'pipeline_failed',
+          details: { stage, error: error instanceof Error ? error.message : String(error) },
+        });
+
+        throw error;
+      }
     }
+
+    // Mark project as ready
+    project.status = 'ready';
+    await project.save();
+
+    await Audit.create({
+      userId,
+      projectId,
+      action: 'pipeline_completed',
+      details: {},
+    });
 
     console.log(`[Pipeline] Completed project ${projectId}`);
     return { status: 'completed', projectId };

@@ -1,6 +1,6 @@
 FROM python:3.12-slim
 
-# Install system dependencies for OCR and document parsing
+# Install system dependencies for OCR, PDF processing, and document parsing
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     tesseract-ocr-ron \
@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ghostscript \
     poppler-utils \
     default-jre-headless \
+    libmupdf-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { z } from 'zod';
 import { connectToDatabase, Project, Audit } from '@/lib/db';
+import { getPipelineQueue } from '@/lib/queue/queues';
 
 const startPipelineSchema = z.object({
   projectId: z.string().min(1),
@@ -25,7 +26,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Pipeline already running' }, { status: 409 });
     }
 
-    // TODO: Add job to BullMQ queue
+    // Queue pipeline job
+    const pipelineQueue = getPipelineQueue();
+    await pipelineQueue.add(
+      `pipeline-${body.projectId}`,
+      {
+        projectId: body.projectId,
+        userId,
+      },
+      {
+        attempts: 1, // Pipeline failures should not auto-retry (user retries manually)
+        jobId: `pipeline-${body.projectId}`, // Prevent duplicate jobs
+      }
+    );
+
     project.status = 'processing';
     await project.save();
 

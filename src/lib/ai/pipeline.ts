@@ -22,13 +22,31 @@ export interface StageResult {
   durationMs: number;
 }
 
-export async function runPipeline(context: PipelineContext): Promise<StageResult[]> {
+/**
+ * Run the AI pipeline for a project.
+ * If `singleStage` is provided, runs only that stage.
+ * Otherwise runs all stages in order.
+ */
+export async function runPipeline(
+  projectId: string,
+  singleStage?: PipelineStage
+): Promise<StageResult[]> {
+  const context = await buildContextFromProject(projectId);
+
+  const stages = singleStage
+    ? [singleStage]
+    : PIPELINE_STAGES_ORDER.filter(
+        (stage) => stage !== 'model' || context.hasModelDocument
+      );
+
   const results: StageResult[] = [];
-  const stages = PIPELINE_STAGES_ORDER.filter(
-    (stage) => stage !== 'model' || context.hasModelDocument
-  );
 
   for (const stage of stages) {
+    if (stage === 'model' && !context.hasModelDocument) {
+      console.log(`[Pipeline] Skipping model stage — no model document`);
+      continue;
+    }
+
     const startTime = Date.now();
     console.log(`[Pipeline] Running stage: ${stage}`);
 
@@ -42,7 +60,7 @@ export async function runPipeline(context: PipelineContext): Promise<StageResult
       };
       results.push(stageResult);
 
-      // Update context with stage output for downstream agents
+      // Update context for downstream agents
       switch (stage) {
         case 'extractor':
           context.projectData = result.output;
@@ -63,6 +81,9 @@ export async function runPipeline(context: PipelineContext): Promise<StageResult
           context.qualityReport = result.output;
           break;
       }
+
+      // Persist stage output to project in MongoDB
+      await saveStageOutput(projectId, stage, result.output);
     } catch (error) {
       console.error(`[Pipeline] Stage ${stage} failed:`, error);
       throw error;
@@ -72,16 +93,76 @@ export async function runPipeline(context: PipelineContext): Promise<StageResult
   return results;
 }
 
+async function buildContextFromProject(projectId: string): Promise<PipelineContext> {
+  const { connectToDatabase, Project, DocumentModel } = await import('@/lib/db');
+  await connectToDatabase();
+
+  const project = await Project.findById(projectId);
+  if (!project) {
+    throw new Error(`Project not found: ${projectId}`);
+  }
+
+  const modelDocs = await DocumentModel.countDocuments({
+    projectId,
+    role: 'model',
+    status: { $ne: 'deleted' },
+  });
+
+  return {
+    projectId,
+    userId: project.userId,
+    hasModelDocument: modelDocs > 0,
+    projectData: project.projectData as Record<string, unknown> | undefined,
+    modelMap: project.modelMap as Record<string, unknown> | undefined,
+    templateSchema: project.templateSchema as Record<string, unknown> | undefined,
+    draftPlan: project.draftPlan as Record<string, unknown> | undefined,
+    fieldCompletions: undefined,
+    qualityReport: project.qualityReport as Record<string, unknown> | undefined,
+  };
+}
+
+async function saveStageOutput(
+  projectId: string,
+  stage: PipelineStage,
+  output: Record<string, unknown>
+): Promise<void> {
+  const { connectToDatabase, Project } = await import('@/lib/db');
+  await connectToDatabase();
+
+  const update: Record<string, Record<string, unknown>> = {};
+  switch (stage) {
+    case 'extractor':
+      update['projectData'] = output;
+      break;
+    case 'model':
+      update['modelMap'] = output;
+      break;
+    case 'template':
+      update['templateSchema'] = output;
+      break;
+    case 'mapping':
+      update['draftPlan'] = output;
+      break;
+    case 'verification':
+      update['qualityReport'] = output;
+      break;
+  }
+
+  if (Object.keys(update).length > 0) {
+    await Project.findByIdAndUpdate(projectId, { $set: update });
+  }
+}
+
 async function runStage(
   stage: PipelineStage,
   _context: PipelineContext,
   _previousResults: StageResult[]
 ): Promise<{ output: Record<string, unknown>; tokenUsage: { inputTokens: number; outputTokens: number } }> {
-  // TODO: Import and call the actual agent for each stage
-  // For now, return placeholder
-  console.log(`[Pipeline] Stage ${stage} — not yet implemented`);
+  // Agents are scaffolded in src/lib/ai/*-agent.ts
+  // Full AI implementation will come in Phase 5
+  console.log(`[Pipeline] Stage ${stage} — placeholder (AI implementation in Phase 5)`);
   return {
-    output: { stage, status: 'not_implemented' },
+    output: { stage, status: 'placeholder', timestamp: new Date().toISOString() },
     tokenUsage: { inputTokens: 0, outputTokens: 0 },
   };
 }

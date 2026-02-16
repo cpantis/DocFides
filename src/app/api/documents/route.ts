@@ -5,6 +5,7 @@ import { connectToDatabase, DocumentModel, Project } from '@/lib/db';
 import { uploadDocumentSchema, validateFileSize, validateMimeType, MAX_SOURCE_FILES, MAX_MODEL_FILES } from '@/lib/utils/validation';
 import { hashFile } from '@/lib/utils/hash';
 import { uploadFile, generateR2Key } from '@/lib/storage/upload';
+import { getOcrQueue } from '@/lib/queue/queues';
 
 export async function POST(req: NextRequest) {
   try {
@@ -82,6 +83,31 @@ export async function POST(req: NextRequest) {
       await Project.findByIdAndUpdate(projectId, { templateDocument: doc._id });
     } else if (role === 'model') {
       await Project.findByIdAndUpdate(projectId, { $push: { modelDocuments: doc._id } });
+    }
+
+    // Queue OCR/parsing job for source and template documents
+    if (role === 'source' || role === 'template') {
+      try {
+        const ocrQueue = getOcrQueue();
+        await ocrQueue.add(
+          `ocr-${doc._id}`,
+          {
+            documentId: String(doc._id),
+            projectId,
+            r2Key,
+            filename: file.name,
+            mimeType: file.type,
+            sha256,
+          },
+          {
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 5000 },
+          }
+        );
+      } catch (queueError) {
+        // Queue failure shouldn't block upload — document is saved, OCR can be retried
+        console.error('[DOCUMENTS_POST] Failed to queue OCR job:', queueError);
+      }
     }
 
     return NextResponse.json({ data: doc }, { status: 201 });
