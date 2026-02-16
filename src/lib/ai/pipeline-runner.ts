@@ -108,8 +108,17 @@ export async function runPipelineBackground(
         const { runPipeline } = await import('@/lib/ai/pipeline');
         await runPipeline(projectId, stage);
       } else {
-        // Simulate with delay
+        // Simulate with delay + save mock data
         await sleep(SIMULATION_DELAYS[stage]);
+
+        const { getMockStageOutput, getStageOutputField } = await import('@/lib/ai/mock-pipeline-data');
+        const outputField = getStageOutputField(stage);
+        if (outputField) {
+          const mockOutput = getMockStageOutput(stage);
+          await Project.findByIdAndUpdate(projectId, {
+            $set: { [outputField]: mockOutput },
+          });
+        }
       }
 
       // Mark stage as completed
