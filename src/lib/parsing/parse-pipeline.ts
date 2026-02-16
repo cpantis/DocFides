@@ -1,18 +1,13 @@
 /**
  * Intelligent document parsing pipeline — main orchestrator.
  *
- * Routes documents to the optimal parsing engine based on file type:
+ * Extraction priority:
+ * 1. Claude AI Vision (primary) — for PDFs and images
+ * 2. Node.js native extractors (fallback) — pdf-parse, mammoth, xlsx, tesseract.js
+ * 3. Python parsing service (legacy) — if PARSING_SERVICE_URL is set
  *
- * | Format        | Engine                               |
- * |---------------|--------------------------------------|
- * | PDF (native)  | pdf-parse → text + table extraction  |
- * | PDF (scanned) | Sharp preprocessing → Tesseract OCR  |
- * | DOCX          | mammoth → text + HTML → tables       |
- * | XLSX/XLS      | SheetJS → structured tables          |
- * | Image         | Sharp preprocessing → Tesseract OCR  |
- * | Text/CSV      | Direct read                          |
- *
- * Falls back to Python parsing service (PARSING_SERVICE_URL) if available.
+ * DOCX and XLSX are always handled by Node.js extractors (mammoth, xlsx)
+ * since they are structured formats that don't need vision capabilities.
  */
 
 import path from 'path';
@@ -77,12 +72,10 @@ export function detectDocumentCategory(
 
 /**
  * Parse a document buffer through the intelligent pipeline.
- * Automatically detects document type and routes to the optimal engine.
  *
- * @param buffer     - Raw file content
- * @param filename   - Original filename (used for type detection and IDs)
- * @param mimeType   - MIME type of the file
- * @returns Parsed document data ready for storage in Extraction collection
+ * For PDFs and images: tries Claude AI Vision first, then Node.js fallback.
+ * For DOCX/XLSX: uses dedicated Node.js extractors directly.
+ * For text/CSV: reads directly.
  */
 export async function parseDocument(
   buffer: Buffer,
@@ -93,19 +86,10 @@ export async function parseDocument(
 
   console.log(`[ParsePipeline] Parsing ${filename} (${category}, ${mimeType}, ${formatSize(buffer.length)})`);
 
-  // Try Python parsing service first if available
-  const pythonResult = await tryPythonService(buffer, filename, mimeType);
-  if (pythonResult) {
-    console.log(`[ParsePipeline] Used Python service for ${filename} — ${pythonResult.rawText.length} chars`);
-    return pythonResult;
-  }
-
-  // Route to Node.js native extractors
   switch (category) {
-    case 'pdf': {
-      const { extractFromPdf } = await import('./pdf-extractor');
-      return extractFromPdf(buffer, filename);
-    }
+    case 'pdf':
+    case 'image':
+      return parseWithAiPrimary(buffer, filename, mimeType, category);
 
     case 'docx': {
       const { extractFromDocx } = await import('./docx-extractor');
@@ -117,13 +101,8 @@ export async function parseDocument(
       return extractFromXlsx(buffer, filename);
     }
 
-    case 'image': {
-      return parseImage(buffer, filename);
-    }
-
-    case 'text': {
+    case 'text':
       return parseText(buffer, filename);
-    }
 
     default:
       return {
@@ -139,7 +118,71 @@ export async function parseDocument(
 }
 
 /**
- * Parse an image file: preprocess → OCR → extract tables.
+ * Parse PDFs and images with Claude AI Vision as primary, Node.js as fallback.
+ *
+ * Chain: AI Vision → Python service → Node.js native
+ */
+async function parseWithAiPrimary(
+  buffer: Buffer,
+  filename: string,
+  mimeType: string,
+  category: 'pdf' | 'image'
+): Promise<ParseResponse> {
+  // For TIFF images: convert to PNG first (Claude doesn't support TIFF directly)
+  let processedBuffer = buffer;
+  let processedMimeType = mimeType;
+  if (mimeType === 'image/tiff' || filename.toLowerCase().endsWith('.tiff') || filename.toLowerCase().endsWith('.tif')) {
+    try {
+      const sharp = (await import('sharp')).default;
+      processedBuffer = await sharp(buffer).png().toBuffer();
+      processedMimeType = 'image/png';
+    } catch (error) {
+      console.warn(`[ParsePipeline] TIFF conversion failed for ${filename}:`, error);
+      // Fall through to other methods
+    }
+  }
+
+  // 1. Try Claude AI Vision (primary method)
+  if (process.env.ANTHROPIC_API_KEY) {
+    try {
+      const { extractWithAI, isAiExtractable } = await import('@/lib/ai/ocr-agent');
+
+      if (isAiExtractable(processedMimeType, filename)) {
+        console.log(`[ParsePipeline] Using Claude AI Vision for ${filename}...`);
+        const result = await extractWithAI(processedBuffer, filename, processedMimeType);
+
+        if (result.rawText.trim().length > 0) {
+          console.log(`[ParsePipeline] AI Vision extracted ${result.rawText.length} chars from ${filename}`);
+          return result;
+        }
+
+        console.warn(`[ParsePipeline] AI Vision returned empty text for ${filename} — trying fallback`);
+      }
+    } catch (error) {
+      console.warn(`[ParsePipeline] AI Vision failed for ${filename}, falling back:`, error instanceof Error ? error.message : error);
+    }
+  }
+
+  // 2. Try Python parsing service (if configured)
+  const pythonResult = await tryPythonService(buffer, filename, mimeType);
+  if (pythonResult) {
+    console.log(`[ParsePipeline] Used Python service for ${filename} — ${pythonResult.rawText.length} chars`);
+    return pythonResult;
+  }
+
+  // 3. Node.js native fallback
+  console.log(`[ParsePipeline] Using Node.js native extractors for ${filename}...`);
+  if (category === 'pdf') {
+    const { extractFromPdf } = await import('./pdf-extractor');
+    return extractFromPdf(buffer, filename);
+  }
+
+  return parseImage(buffer, filename);
+}
+
+/**
+ * Parse an image file: preprocess → Tesseract.js OCR → extract tables.
+ * Used as last-resort fallback when AI Vision is unavailable.
  */
 async function parseImage(
   buffer: Buffer,
@@ -163,10 +206,9 @@ async function parseImage(
     const result = await recognizeImage(preprocessed.buffer, {
       page: 1,
       source: 'sharp-tesseract',
-      skipPreprocess: true, // Already preprocessed
+      skipPreprocess: true,
     });
 
-    // Add DPI warning to all blocks
     for (const block of result.blocks) {
       block.warnings.push(...warnings);
     }
@@ -215,14 +257,13 @@ function parseText(buffer: Buffer, filename: string): ParseResponse {
     id: `txt_${sanitizeId(filename)}`,
     type: 'text',
     content: text,
-    source: 'pdf-parse', // Closest match in type system
+    source: 'pdf-parse',
     confidence: 98,
     page: 1,
     position: { x: 0, y: 0, w: 0, h: 0 },
     warnings: [],
   }];
 
-  // CSV: also extract as a table
   const tables = ext === '.csv' ? parseCsv(text) : [];
 
   return {
@@ -243,7 +284,6 @@ function parseCsv(text: string): Array<{ headers: string[]; rows: string[][]; co
   const lines = text.split('\n').filter((l) => l.trim());
   if (lines.length < 2) return [];
 
-  // Detect delimiter (comma, semicolon, tab)
   const firstLine = lines[0] ?? '';
   const delimiters = [',', ';', '\t'];
   let bestDelimiter = ',';
@@ -275,7 +315,7 @@ function parseCsv(text: string): Array<{ headers: string[]; rows: string[][]; co
 
 /**
  * Try the Python parsing service if available.
- * Returns null if the service is not running.
+ * Returns null if the service is not running or not configured.
  */
 async function tryPythonService(
   buffer: Buffer,
@@ -292,7 +332,6 @@ async function tryPythonService(
 
     return await pythonParse(buffer, filename, mimeType);
   } catch {
-    // Python service not available — fall through to Node.js extractors
     return null;
   }
 }
@@ -318,7 +357,6 @@ export async function parseAndStore(
   if (cached) {
     console.log(`[ParsePipeline] Cache hit for ${filename} (SHA256: ${sha256.slice(0, 12)}...)`);
 
-    // Ensure Extraction record exists for this documentId
     const existing = await Extraction.findOne({ documentId });
     if (!existing) {
       await Extraction.create({
