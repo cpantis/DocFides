@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
 import { connectToDatabase, Project, Audit } from '@/lib/db';
 import { getPipelineQueue } from '@/lib/queue/queues';

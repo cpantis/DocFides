@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth/mock-auth';
 import { connectToDatabase, DocumentModel, Audit } from '@/lib/db';
 import { deleteFile } from '@/lib/storage/cleanup';
 

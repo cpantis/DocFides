@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
 import { connectToDatabase, DocumentModel, Project } from '@/lib/db';
 import { uploadDocumentSchema, validateFileSize, validateMimeType, MAX_SOURCE_FILES, MAX_MODEL_FILES } from '@/lib/utils/validation';

@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getMessages } from 'next-intl/server';
-import { ClerkProvider } from '@clerk/nextjs';
 import { Plus_Jakarta_Sans, Inter, JetBrains_Mono } from 'next/font/google';
 import { notFound } from 'next/navigation';
 import { locales } from '@/i18n/config';
@@ -49,11 +48,9 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} className={`${plusJakarta.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="min-h-screen bg-white text-gray-900 antialiased">
-        <ClerkProvider>
-          <NextIntlClientProvider messages={messages}>
-            {children}
-          </NextIntlClientProvider>
-        </ClerkProvider>
+        <NextIntlClientProvider messages={messages}>
+          {children}
+        </NextIntlClientProvider>
       </body>
     </html>
   );

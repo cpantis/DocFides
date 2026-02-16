@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth/mock-auth';
 import { connectToDatabase, User, Project, Generation } from '@/lib/db';
 
 export async function GET() {
