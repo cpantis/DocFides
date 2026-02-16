@@ -232,6 +232,7 @@
       "localFolderHint": "Point each category to a local folder containing your documents. Scan to preview, then import.",
       "folderPlaceholder": "/path/to/folder",
       "serverPath": "App running at",
+      "browse": "Browse folders",
       "scan": "Scan",
       "importing": "Importing...",
       "importFiles": "Import {count} file(s)",
@@ -244,7 +245,15 @@
       "startProcessing": "Start Processing",
       "maxFiles": "Maximum {max} files",
       "maxSize": "Maximum {max}MB per file",
-      "acceptedFormats": "Accepted: PDF, DOCX, XLSX, XLS, PNG, JPG, TIFF"
+      "acceptedFormats": "Accepted: PDF, DOCX, XLSX, XLS, PNG, JPG, TIFF",
+      "browser": {
+        "title": "Browse Folders",
+        "goUp": "Go to parent folder",
+        "goHome": "Go to home folder",
+        "emptyFolder": "This folder is empty",
+        "cancel": "Cancel",
+        "selectFolder": "Select This Folder"
+      }
     },
     "processing": {
       "title": "AI Processing",

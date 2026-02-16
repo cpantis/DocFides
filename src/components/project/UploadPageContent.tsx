@@ -18,6 +18,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { ModelDocBadge } from './ModelDocBadge';
+import { FolderBrowserModal } from './FolderBrowserModal';
 import { cn } from '@/lib/utils/cn';
 
 interface PlatformInfo {
@@ -320,9 +321,14 @@ function FolderSection({
   badge,
 }: FolderSectionProps) {
   const t = useTranslations('project.upload');
+  const [browserOpen, setBrowserOpen] = useState(false);
   const newFilesCount = state.files.filter((f) => !f.alreadyImported).length;
   const allImported = state.scanned && newFilesCount === 0 && state.files.length > 0;
   const hasCapacity = existingCount < maxFiles;
+
+  const handleFolderSelect = (selectedPath: string) => {
+    setState((prev) => ({ ...prev, path: selectedPath, scanned: false }));
+  };
 
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
@@ -337,10 +343,17 @@ function FolderSection({
       </div>
       <p className="mt-1 text-sm text-gray-500">{hint}</p>
 
-      {/* Path input + scan */}
+      {/* Path input + browse + scan */}
       <div className="mt-4 flex gap-2">
         <div className="relative flex-1">
-          <FolderOpen className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <button
+            type="button"
+            onClick={() => setBrowserOpen(true)}
+            title={t('browse')}
+            className="absolute left-3 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 transition-colors hover:text-primary-600"
+          >
+            <FolderOpen className="h-4 w-4" />
+          </button>
           <input
             type="text"
             value={state.path}
@@ -451,6 +464,14 @@ function FolderSection({
           ))}
         </div>
       )}
+
+      {/* Folder browser modal */}
+      <FolderBrowserModal
+        open={browserOpen}
+        onClose={() => setBrowserOpen(false)}
+        onSelect={handleFolderSelect}
+        initialPath={state.path || undefined}
+      />
     </section>
   );
 }
