@@ -1,12 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
 import { promises as fs } from 'fs';
 import path from 'path';
+import os from 'os';
 import { connectToDatabase, DocumentModel, Project } from '@/lib/db';
 import { hashFile } from '@/lib/utils/hash';
 import { generateR2Key } from '@/lib/storage/upload';
 import { uploadFileLocal } from '@/lib/storage/dev-storage';
+
+/**
+ * GET /api/documents/import-local
+ *
+ * Returns server platform info and default paths so the UI
+ * can show OS-appropriate placeholders and suggestions.
+ */
+export async function GET() {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const platform = os.platform(); // 'win32', 'darwin', 'linux'
+  const homeDir = os.homedir();
+  const cwd = process.cwd();
+
+  return NextResponse.json({
+    data: {
+      platform,
+      separator: path.sep,
+      homeDir,
+      cwd,
+      defaultBasePath: path.join(cwd, 'dev-documents'),
+      examplePath: platform === 'win32'
+        ? path.join(homeDir, 'Documents', 'project-docs')
+        : path.join(homeDir, 'Documents', 'project-docs'),
+    },
+  });
+}
 
 const MIME_MAP: Record<string, string> = {
   '.pdf': 'application/pdf',

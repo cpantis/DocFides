@@ -231,6 +231,7 @@
       "filenameHint": "Sfat: Numește fișierele descriptiv (ex: CI_beneficiar_Popescu.pdf)",
       "localFolderHint": "Indică pentru fiecare categorie un folder local cu documentele tale. Scanează pentru previzualizare, apoi importă.",
       "folderPlaceholder": "/cale/catre/folder",
+      "serverPath": "Aplicația rulează la",
       "scan": "Scanează",
       "importing": "Se importă...",
       "importFiles": "Importă {count} fișier(e)",

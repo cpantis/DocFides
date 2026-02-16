@@ -231,6 +231,7 @@
       "filenameHint": "Tip: Name files descriptively (e.g., CI_beneficiar_Popescu.pdf)",
       "localFolderHint": "Point each category to a local folder containing your documents. Scan to preview, then import.",
       "folderPlaceholder": "/path/to/folder",
+      "serverPath": "App running at",
       "scan": "Scan",
       "importing": "Importing...",
       "importFiles": "Import {count} file(s)",

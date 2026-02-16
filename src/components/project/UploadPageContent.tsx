@@ -4,6 +4,7 @@ import { useState, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useProject } from '@/lib/hooks/use-projects';
+import useSWR from 'swr';
 import {
   ArrowLeft,
   ArrowRight,
@@ -18,6 +19,17 @@ import {
 } from 'lucide-react';
 import { ModelDocBadge } from './ModelDocBadge';
 import { cn } from '@/lib/utils/cn';
+
+interface PlatformInfo {
+  platform: string;
+  separator: string;
+  homeDir: string;
+  cwd: string;
+  defaultBasePath: string;
+  examplePath: string;
+}
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 interface UploadPageContentProps {
   projectId: string;
@@ -60,6 +72,15 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
   const t = useTranslations('project.upload');
   const tc = useTranslations('common');
   const { project, isLoading, mutate } = useProject(projectId);
+
+  // Fetch server platform info for OS-appropriate paths
+  const { data: platformData } = useSWR<{ data: PlatformInfo }>(
+    '/api/documents/import-local',
+    fetcher
+  );
+  const platform = platformData?.data;
+  const isWin = platform?.platform === 'win32';
+  const folderPlaceholder = isWin ? 'C:\\Users\\...\\folder' : '/path/to/folder';
 
   const [template, setTemplate] = useState<CategoryState>(defaultCategory());
   const [model, setModel] = useState<CategoryState>(defaultCategory());
@@ -200,6 +221,11 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
           <div className="text-sm text-blue-700">
             <p>{t('localFolderHint')}</p>
             <p className="mt-1 text-blue-600">{t('filenameHint')}</p>
+            {platform && (
+              <p className="mt-2 font-mono text-xs text-blue-500">
+                {t('serverPath')}: {platform.cwd}
+              </p>
+            )}
           </div>
         </div>
 
@@ -214,7 +240,7 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
           onImport={(path) => importCategory('template', setTemplate, path)}
           maxFiles={1}
           existingCount={hasTemplate ? 1 : 0}
-          placeholder={t('folderPlaceholder')}
+          placeholder={folderPlaceholder}
         />
 
         {/* Model (optional) */}
@@ -228,7 +254,7 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
           onImport={(path) => importCategory('model', setModel, path)}
           maxFiles={2}
           existingCount={project.modelDocuments?.length ?? 0}
-          placeholder={t('folderPlaceholder')}
+          placeholder={folderPlaceholder}
           badge={<ModelDocBadge />}
         />
 
@@ -243,7 +269,7 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
           onImport={(path) => importCategory('source', setSource, path)}
           maxFiles={10}
           existingCount={sourceCount}
-          placeholder={t('folderPlaceholder')}
+          placeholder={folderPlaceholder}
         />
 
         {/* Continue button */}
