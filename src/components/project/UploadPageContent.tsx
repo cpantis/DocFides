@@ -65,23 +65,6 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
           <p className="text-sm text-blue-700">{t('filenameHint')}</p>
         </div>
 
-        {/* Source documents */}
-        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="font-heading text-lg font-bold text-gray-900">
-            {t('sourceLabel')}
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">{t('sourceHint')}</p>
-          <div className="mt-4">
-            <UploadZone
-              projectId={projectId}
-              role="source"
-              maxFiles={10}
-              existingCount={sourceCount}
-              onUploadComplete={() => mutate()}
-            />
-          </div>
-        </section>
-
         {/* Template */}
         <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <h2 className="font-heading text-lg font-bold text-gray-900">
@@ -113,6 +96,23 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
               role="model"
               maxFiles={2}
               existingCount={modelCount}
+              onUploadComplete={() => mutate()}
+            />
+          </div>
+        </section>
+
+        {/* Source documents */}
+        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h2 className="font-heading text-lg font-bold text-gray-900">
+            {t('sourceLabel')}
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">{t('sourceHint')}</p>
+          <div className="mt-4">
+            <UploadZone
+              projectId={projectId}
+              role="source"
+              maxFiles={10}
+              existingCount={sourceCount}
               onUploadComplete={() => mutate()}
             />
           </div>
