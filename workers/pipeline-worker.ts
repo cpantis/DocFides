@@ -9,7 +9,7 @@ const connection = {
   url: process.env.REDIS_URL ?? 'redis://localhost:6379',
 };
 
-const PIPELINE_STAGES = ['extractor', 'model', 'template', 'mapping', 'writing', 'verification'] as const;
+const PIPELINE_STAGES = ['parser', 'extractor', 'model', 'template', 'mapping', 'writing', 'verification'] as const;
 
 export const pipelineWorker = new Worker<PipelineJobData>(
   'pipeline',
@@ -27,47 +27,29 @@ export const pipelineWorker = new Worker<PipelineJobData>(
       throw new Error(`Project not found: ${projectId}`);
     }
 
-    // Check source documents — allow partial extraction (at least one must be ready)
-    const sourceDocs = await DocumentModel.find({
+    // Verify at least one source document exists (parser stage will handle extraction)
+    const sourceCount = await DocumentModel.countDocuments({
       projectId,
       role: 'source',
       status: { $ne: 'deleted' },
     });
 
-    const extracted = sourceDocs.filter((d) => d.status === 'extracted');
-    const failed = sourceDocs.filter((d) => d.status === 'failed');
-    const pending = sourceDocs.filter((d) => d.status !== 'extracted' && d.status !== 'failed');
-
-    if (extracted.length === 0) {
-      const total = sourceDocs.length;
-      if (total === 0) {
-        throw new Error('No source documents uploaded. Upload at least one source document.');
-      } else if (failed.length === total) {
-        throw new Error(`All ${total} source documents failed extraction. Check the parsing service and re-upload.`);
-      } else {
-        throw new Error(
-          `No source documents are ready yet (${pending.length} still processing, ${failed.length} failed). Wait for OCR to complete.`
-        );
-      }
+    if (sourceCount === 0) {
+      throw new Error('No source documents uploaded. Upload at least one source document.');
     }
 
-    // Log partial extraction warnings
-    if (failed.length > 0) {
-      console.warn(
-        `[Pipeline] Proceeding with ${extracted.length}/${sourceDocs.length} extracted documents. ` +
-        `${failed.length} document(s) failed and will be skipped: ` +
-        failed.map((d) => d.originalFilename).join(', ')
-      );
-    }
-    if (pending.length > 0) {
-      console.warn(
-        `[Pipeline] ${pending.length} document(s) still processing and will be skipped: ` +
-        pending.map((d) => d.originalFilename).join(', ')
-      );
-    }
+    // Determine stages to run (skip model if no model documents)
+    const modelCount = await DocumentModel.countDocuments({
+      projectId,
+      role: 'model',
+      status: { $ne: 'deleted' },
+    });
+    const stages = PIPELINE_STAGES.filter(
+      (stage) => stage !== 'model' || modelCount > 0
+    );
 
-    // Run the 6-stage AI pipeline
-    for (const stage of PIPELINE_STAGES) {
+    // Run the 7-stage agentic AI pipeline
+    for (const stage of stages) {
       await job.updateProgress({ stage, status: 'running' });
       console.log(`[Pipeline] Running ${stage} agent...`);
 
@@ -79,8 +61,7 @@ export const pipelineWorker = new Worker<PipelineJobData>(
         console.error(`[Pipeline] ${stage} failed:`, error);
         await job.updateProgress({ stage, status: 'failed' });
 
-        // Update project status
-        project.status = 'draft'; // Reset so user can retry
+        project.status = 'draft';
         await project.save();
 
         await Audit.create({
@@ -102,7 +83,7 @@ export const pipelineWorker = new Worker<PipelineJobData>(
       userId,
       projectId,
       action: 'pipeline_completed',
-      details: { extractedDocs: extracted.length, totalDocs: sourceDocs.length },
+      details: {},
     });
 
     console.log(`[Pipeline] Completed project ${projectId}`);

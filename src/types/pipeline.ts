@@ -1,4 +1,4 @@
-export type PipelineStage = 'extractor' | 'model' | 'template' | 'mapping' | 'writing' | 'verification';
+export type PipelineStage = 'parser' | 'extractor' | 'model' | 'template' | 'mapping' | 'writing' | 'verification';
 export type PipelineStatus = 'queued' | 'running' | 'completed' | 'failed';
 
 export interface PipelineJob {
@@ -29,6 +29,7 @@ export interface PipelineStageResult {
 }
 
 export const AGENT_MODELS = {
+  parser: 'claude-sonnet-4-5-20250929',
   extractor: 'claude-sonnet-4-5-20250929',
   model: 'claude-sonnet-4-5-20250929',
   template: 'claude-sonnet-4-5-20250929',
@@ -38,6 +39,7 @@ export const AGENT_MODELS = {
 } as const;
 
 export const PIPELINE_STAGES_ORDER: PipelineStage[] = [
+  'parser',
   'extractor',
   'model',
   'template',

@@ -138,6 +138,9 @@ async function saveStageOutput(
 
   const update: Record<string, Record<string, unknown>> = {};
   switch (stage) {
+    case 'parser':
+      // Parser stage output is a summary — no project-level field to persist
+      break;
     case 'extractor':
       update['projectData'] = output;
       break;
@@ -211,6 +214,184 @@ async function getDocumentTexts(
 }
 
 /**
+ * Run the Parser Agent stage.
+ *
+ * For each document not yet extracted, downloads the file and parses it
+ * using Claude AI Vision (PDFs, images) or Node.js extractors (DOCX, XLSX).
+ * Creates Extraction records in MongoDB so downstream agents can read the text.
+ *
+ * Returns a summary of parsed documents as the stage output.
+ */
+async function runParserStage(projectId: string): Promise<AgentResult> {
+  const { connectToDatabase, DocumentModel, Extraction } = await import('@/lib/db');
+  await connectToDatabase();
+
+  // Find all documents that need parsing (status !== 'extracted' and !== 'deleted')
+  const docs = await DocumentModel.find({
+    projectId,
+    status: { $in: ['uploaded', 'processing', 'failed'] },
+  });
+
+  if (docs.length === 0) {
+    // All documents already extracted — return summary of existing extractions
+    const extractedDocs = await DocumentModel.find({ projectId, status: 'extracted' });
+    return {
+      output: {
+        parsed: extractedDocs.length,
+        skipped: 0,
+        failed: 0,
+        documents: extractedDocs.map((d) => ({
+          filename: d.originalFilename,
+          role: d.role,
+          status: 'already_extracted',
+        })),
+      },
+      tokenUsage: { inputTokens: 0, outputTokens: 0 },
+    };
+  }
+
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  const results: Array<{ filename: string; role: string; status: string; chars?: number }> = [];
+
+  for (const doc of docs) {
+    const docId = String(doc._id);
+    console.log(`[ParserAgent] Parsing ${doc.originalFilename} (${doc.role}, ${doc.mimeType})...`);
+
+    try {
+      // Check if extraction already exists by SHA256 (cache)
+      const cachedExtraction = await Extraction.findOne({ sha256: doc.sha256 });
+      if (cachedExtraction) {
+        console.log(`[ParserAgent] Cache hit for ${doc.originalFilename}`);
+        // Ensure extraction record linked to this documentId exists
+        const existing = await Extraction.findOne({ documentId: docId });
+        if (!existing) {
+          await Extraction.create({
+            documentId: docId,
+            sha256: doc.sha256,
+            projectId,
+            blocks: cachedExtraction.blocks,
+            rawText: cachedExtraction.rawText,
+            tables: cachedExtraction.tables,
+            overallConfidence: cachedExtraction.overallConfidence,
+            language: cachedExtraction.language,
+            processingTimeMs: 0,
+          });
+        }
+        await DocumentModel.findByIdAndUpdate(docId, { status: 'extracted' });
+        results.push({
+          filename: doc.originalFilename,
+          role: doc.role,
+          status: 'cached',
+          chars: (cachedExtraction.rawText ?? '').length,
+        });
+        continue;
+      }
+
+      // Download file
+      await DocumentModel.findByIdAndUpdate(docId, { status: 'processing' });
+      let fileBuffer: Buffer;
+      try {
+        const { downloadFile } = await import('@/lib/storage/download');
+        fileBuffer = await downloadFile(doc.r2Key);
+      } catch {
+        // Try local dev storage
+        const { downloadFileLocal } = await import('@/lib/storage/dev-storage');
+        fileBuffer = await downloadFileLocal(doc.r2Key);
+      }
+
+      // Parse using the intelligent pipeline (AI Vision → Python → Node.js)
+      const { parseDocument } = await import('@/lib/parsing/parse-pipeline');
+      const { calculateOverallConfidence } = await import('@/lib/parsing/confidence');
+
+      const parseResult = await parseDocument(fileBuffer, doc.originalFilename, doc.mimeType);
+
+      // Track token usage from AI Vision calls (embedded in processing time as proxy)
+      // The actual tokens are tracked inside ocr-agent.ts via callAgentWithRetry
+
+      // Evaluate confidence
+      type BlockForConfidence = Parameters<typeof calculateOverallConfidence>[0][number];
+      const blocksForConfidence = parseResult.blocks as BlockForConfidence[];
+      const overall = calculateOverallConfidence(blocksForConfidence);
+
+      // Store extraction in MongoDB
+      await Extraction.create({
+        documentId: docId,
+        sha256: doc.sha256,
+        projectId,
+        blocks: parseResult.blocks,
+        rawText: parseResult.rawText,
+        tables: parseResult.tables,
+        overallConfidence: overall.score,
+        language: parseResult.language,
+        processingTimeMs: parseResult.processingTimeMs,
+      });
+
+      // Mark document as extracted
+      await DocumentModel.findByIdAndUpdate(docId, {
+        status: 'extracted',
+        extractionBlocks: parseResult.blocks,
+        pageCount: parseResult.pageCount,
+        parsingErrors: overall.warnings.length > 0 ? overall.warnings : undefined,
+      });
+
+      console.log(
+        `[ParserAgent] Extracted ${doc.originalFilename}: ${parseResult.rawText.length} chars, ` +
+        `${parseResult.tables.length} tables, ${overall.score}% confidence`
+      );
+
+      results.push({
+        filename: doc.originalFilename,
+        role: doc.role,
+        status: 'extracted',
+        chars: parseResult.rawText.length,
+      });
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error(`[ParserAgent] Failed to parse ${doc.originalFilename}:`, errMsg);
+
+      await DocumentModel.findByIdAndUpdate(docId, {
+        status: 'failed',
+        parsingErrors: [errMsg],
+      });
+
+      results.push({
+        filename: doc.originalFilename,
+        role: doc.role,
+        status: 'failed',
+      });
+    }
+  }
+
+  const parsed = results.filter((r) => r.status === 'extracted' || r.status === 'cached').length;
+  const failed = results.filter((r) => r.status === 'failed').length;
+
+  // Verify at least source documents are available after parsing
+  const extractedSources = await DocumentModel.countDocuments({
+    projectId,
+    role: 'source',
+    status: 'extracted',
+  });
+
+  if (extractedSources === 0) {
+    throw new Error(
+      `Parser agent could not extract any source documents (${failed} failed). ` +
+      `The pipeline cannot proceed without at least one readable source document.`
+    );
+  }
+
+  return {
+    output: {
+      parsed,
+      failed,
+      skipped: 0,
+      documents: results,
+    },
+    tokenUsage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+  };
+}
+
+/**
  * Run a single pipeline stage, routing to the appropriate agent.
  */
 async function runStage(
@@ -218,6 +399,9 @@ async function runStage(
   context: PipelineContext
 ): Promise<AgentResult> {
   switch (stage) {
+    case 'parser':
+      return runParserStage(context.projectId);
+
     case 'extractor': {
       const sourceDocs = await getDocumentTexts(context.projectId, 'source');
       if (sourceDocs.length === 0) {

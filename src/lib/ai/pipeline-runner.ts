@@ -119,51 +119,19 @@ export async function runPipelineBackground(
     return;
   }
 
-  // Pre-flight check 2: Parsing service health (warning only — Node.js native parsers are the fallback)
-  try {
-    const { checkParsingServiceHealth } = await import('@/lib/parsing/detector');
-    const parsingHealthy = await checkParsingServiceHealth();
-    if (!parsingHealthy) {
-      console.warn(
-        '[Pipeline] Python parsing service is unavailable — Node.js native parsers (pdf-parse, mammoth, tesseract.js, xlsx) will be used as fallback.'
-      );
-    }
-  } catch {
-    console.warn('[Pipeline] Could not check parsing service health — continuing with Node.js native parsers.');
-  }
-
-  // Pre-flight check 3: At least one source document extracted (partial is OK)
-  const sourceDocs = await DocumentModel.find({
+  // Pre-flight check 2: At least one source document exists (parsing is handled by the parser agent stage)
+  const sourceCount = await DocumentModel.countDocuments({
     projectId,
     role: 'source',
     status: { $ne: 'deleted' },
   });
-
-  const extracted = sourceDocs.filter((d) => d.status === 'extracted');
-  const failed = sourceDocs.filter((d) => d.status === 'failed');
-
-  if (extracted.length === 0) {
-    const totalCount = sourceDocs.length;
-    const failedCount = failed.length;
-    let errorMsg = 'No source documents have been extracted yet.';
-    if (totalCount === 0) {
-      errorMsg = 'No source documents uploaded. Upload at least one source document before running the pipeline.';
-    } else if (failedCount === totalCount) {
-      errorMsg = `All ${totalCount} source documents failed extraction. Check the parsing service and re-upload.`;
-    } else {
-      errorMsg = `No source documents are ready yet (${totalCount - failedCount} still processing, ${failedCount} failed). Wait for OCR to complete.`;
-    }
-    await failPipelineEarly(projectId, userId, errorMsg);
-    return;
-  }
-
-  // Warn about skipped documents but proceed
-  if (failed.length > 0) {
-    console.warn(
-      `[Pipeline] Proceeding with ${extracted.length}/${sourceDocs.length} extracted documents. ` +
-      `${failed.length} document(s) failed extraction and will be skipped: ` +
-      failed.map((d) => d.originalFilename).join(', ')
+  if (sourceCount === 0) {
+    await failPipelineEarly(
+      projectId,
+      userId,
+      'No source documents uploaded. Upload at least one source document before running the pipeline.'
     );
+    return;
   }
 
   // Determine which stages to run (skip model if no model documents)
@@ -187,7 +155,7 @@ export async function runPipelineBackground(
     $set: { pipelineProgress, status: 'processing' },
   });
 
-  console.log(`[Pipeline] Starting AI pipeline for project ${projectId} (${extracted.length} source docs)`);
+  console.log(`[Pipeline] Starting AI pipeline for project ${projectId} (${sourceCount} source docs)`);
 
   for (const stage of stages) {
     // Mark stage as running
