@@ -24,7 +24,17 @@ export interface TableData {
 }
 
 export type BlockType = 'text' | 'table' | 'heading' | 'list';
-export type BlockSource = 'tika' | 'tesseract' | 'easyocr' | 'img2table' | 'camelot' | 'openpyxl';
+export type BlockSource =
+  | 'tika'
+  | 'tesseract'
+  | 'easyocr'
+  | 'img2table'
+  | 'camelot'
+  | 'openpyxl'
+  | 'pdf-parse'
+  | 'mammoth'
+  | 'xlsx'
+  | 'sharp-tesseract';
 
 export interface ExtractionBlock {
   id: string;
