@@ -1,9 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useProject } from '@/lib/hooks/use-projects';
-import { ArrowLeft, ArrowRight, Info, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FolderOpen, Info, Loader2 } from 'lucide-react';
 import { UploadZone } from './UploadZone';
 import { ModelDocBadge } from './ModelDocBadge';
 
@@ -14,6 +15,31 @@ interface UploadPageContentProps {
 export function UploadPageContent({ projectId }: UploadPageContentProps) {
   const t = useTranslations('project.upload');
   const { project, isLoading, mutate } = useProject(projectId);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ total: number; errors: string[] } | null>(null);
+
+  const importFromLocal = async () => {
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const res = await fetch('/api/documents/import-local', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setImportResult({ total: data.data.total, errors: data.data.errors });
+        mutate();
+      } else {
+        setImportResult({ total: 0, errors: [data.error || 'Import failed'] });
+      }
+    } catch {
+      setImportResult({ total: 0, errors: ['Failed to connect to server'] });
+    } finally {
+      setImporting(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -63,6 +89,39 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
         <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 p-4">
           <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-500" />
           <p className="text-sm text-blue-700">{t('filenameHint')}</p>
+        </div>
+
+        {/* Import from local folder (dev shortcut) */}
+        <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FolderOpen className="h-5 w-5 text-gray-400" />
+              <div>
+                <p className="text-sm font-medium text-gray-700">Import from local folder</p>
+                <p className="text-xs text-gray-400">
+                  Scans <code className="rounded bg-gray-100 px-1">dev-documents/</code> with <code className="rounded bg-gray-100 px-1">template/</code> <code className="rounded bg-gray-100 px-1">model/</code> <code className="rounded bg-gray-100 px-1">source/</code> subfolders
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={importFromLocal}
+              disabled={importing}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+            >
+              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderOpen className="h-4 w-4" />}
+              {importing ? 'Importing...' : 'Scan & Import'}
+            </button>
+          </div>
+          {importResult && (
+            <div className="mt-3 text-xs">
+              {importResult.total > 0 && (
+                <p className="text-green-600">{importResult.total} file(s) imported successfully</p>
+              )}
+              {importResult.errors.map((err, i) => (
+                <p key={i} className="text-amber-600">{err}</p>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Template */}

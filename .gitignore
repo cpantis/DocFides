@@ -32,6 +32,12 @@ yarn-error.log*
 # local dev uploads
 .uploads/
 
+# dev-documents content (keep folder structure via .gitkeep)
+dev-documents/template/*
+dev-documents/model/*
+dev-documents/source/*
+!dev-documents/**/.gitkeep
+
 # vercel
 .vercel
 
