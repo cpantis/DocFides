@@ -1,0 +1,306 @@
+{
+  "common": {
+    "appName": "DocFides",
+    "tagline": "Documentație de proiect asistată de AI",
+    "getStarted": "Începe acum",
+    "signIn": "Autentificare",
+    "signUp": "Înregistrare",
+    "dashboard": "Panou de control",
+    "settings": "Setări",
+    "export": "Export",
+    "cancel": "Anulează",
+    "save": "Salvează",
+    "delete": "Șterge",
+    "loading": "Se încarcă...",
+    "error": "Ceva nu a funcționat corect",
+    "retry": "Reîncearcă",
+    "back": "Înapoi",
+    "next": "Înainte",
+    "confirm": "Confirmă",
+    "close": "Închide",
+    "search": "Caută",
+    "noResults": "Nu s-au găsit rezultate",
+    "upload": "Încarcă",
+    "download": "Descarcă",
+    "processing": "Se procesează...",
+    "ready": "Gata",
+    "draft": "Ciornă"
+  },
+  "landing": {
+    "hero": {
+      "title": "Transformă documentele sursă în documentație completă",
+      "subtitle": "Încarcă sursele, lasă AI-ul să extragă, mapeze și scrie. Revizuiește, editează, exportă. Gata.",
+      "cta": "Începe gratuit",
+      "secondaryCta": "Vezi cum funcționează",
+      "badges": {
+        "ocr": "OCR și extragere tabele",
+        "languages": "50+ limbi",
+        "gdpr": "Conform GDPR"
+      }
+    },
+    "howItWorks": {
+      "title": "Cum funcționează",
+      "subtitle": "Patru pași simpli de la documente sursă la rezultat finalizat",
+      "steps": {
+        "upload": {
+          "title": "Încarcă documentele",
+          "description": "Surse, șabloane, exemple model"
+        },
+        "process": {
+          "title": "AI procesează",
+          "description": "6 agenți AI extrag, mapează și scriu"
+        },
+        "review": {
+          "title": "Revizuiește și editează",
+          "description": "Editor split-screen cu acceptă/editează/sari"
+        },
+        "export": {
+          "title": "Exportă",
+          "description": "Un singur click, păstrând toată formatarea"
+        }
+      }
+    },
+    "features": {
+      "title": "Funcționalități",
+      "subtitle": "Tot ce ai nevoie pentru documentație profesională",
+      "items": {
+        "aiPipeline": {
+          "title": "Pipeline AI cu 6 agenți",
+          "description": "Extrage, analizează, mapează, scrie, verifică — fiecare pas gestionat de un agent AI specializat"
+        },
+        "ocr": {
+          "title": "OCR avansat",
+          "description": "Extrage text din scanări, fotografii și tabele complexe cu scor de încredere"
+        },
+        "entityDetection": {
+          "title": "Detectare entități",
+          "description": "Identifică automat beneficiarii, contractorii și subcontractorii din documentele tale"
+        },
+        "styleMatching": {
+          "title": "Potrivire stil",
+          "description": "AI-ul învață tonul, vocabularul și structura din documentele tale model"
+        },
+        "verification": {
+          "title": "Verificare AI",
+          "description": "Verifică încrucișat toate datele pentru acuratețe, consistență și completitudine"
+        },
+        "export": {
+          "title": "Export DOCX și PDF",
+          "description": "Tabele dinamice, secțiuni condiționale, date antet/subsol — toate formatate corect"
+        }
+      }
+    },
+    "parsing": {
+      "title": "Parsare de documente de top",
+      "subtitle": "De la scanări șifonate la date structurate",
+      "badges": {
+        "tesseract": "Tesseract 5 OCR",
+        "tables": "Detectare tabele",
+        "deskew": "Corecție automată",
+        "languages": "80+ limbi"
+      }
+    },
+    "pricing": {
+      "title": "Prețuri",
+      "subtitle": "Alege planul potrivit volumului tău de lucru",
+      "free": {
+        "name": "Gratuit",
+        "price": "0",
+        "currency": "RON",
+        "period": "lună",
+        "features": {
+          "docs": "3 documente/lună",
+          "storage": "100MB stocare",
+          "support": "Suport comunitar"
+        },
+        "cta": "Începe gratuit"
+      },
+      "professional": {
+        "name": "Profesional",
+        "price": "99",
+        "currency": "RON",
+        "period": "lună",
+        "features": {
+          "docs": "50 documente/lună",
+          "storage": "5GB stocare",
+          "support": "Suport prioritar",
+          "models": "Analiză document model"
+        },
+        "cta": "Abonează-te",
+        "popular": "Cel mai popular"
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "price": "Personalizat",
+        "currency": "",
+        "period": "",
+        "features": {
+          "docs": "Documente nelimitate",
+          "storage": "Stocare nelimitată",
+          "support": "Suport dedicat",
+          "sso": "SSO și jurnal audit"
+        },
+        "cta": "Contactează-ne"
+      }
+    },
+    "faq": {
+      "title": "Întrebări frecvente",
+      "items": {
+        "whatIs": {
+          "question": "Ce este DocFides?",
+          "answer": "DocFides este o platformă bazată pe AI care automatizează completarea documentației de proiect. Încarci documentele sursă, o referință de stil opțională și un șablon — iar pipeline-ul nostru AI extrage datele, le mapează pe câmpuri și generează text profesional."
+        },
+        "security": {
+          "question": "Datele mele sunt în siguranță?",
+          "answer": "Da. Fișierele sunt stocate temporar (ștergere automată la 24 de ore), procesate în pipeline-uri izolate și nu sunt folosite pentru antrenarea AI-ului. Toate transferurile folosesc conexiuni criptate."
+        },
+        "languages": {
+          "question": "Ce limbi sunt suportate?",
+          "answer": "Motorul OCR suportă peste 80 de limbi. Pipeline-ul de scriere AI funcționează cel mai bine cu documentație în română și engleză, cu suport complet pentru diacritice și terminologie de domeniu."
+        },
+        "formats": {
+          "question": "Ce formate de fișiere pot încărca?",
+          "answer": "Acceptăm PDF (nativ și scanat), DOCX, XLSX, XLS, PNG, JPG și TIFF. Dimensiunea maximă per fișier este 25MB."
+        },
+        "accuracy": {
+          "question": "Cât de precis este AI-ul?",
+          "answer": "Fiecare câmp extras primește un scor de încredere. Câmpurile peste 90% sunt acceptate automat, iar cele cu încredere mai scăzută sunt marcate pentru revizuirea ta. Agentul de verificare verifică încrucișat toate datele înainte de export."
+        }
+      }
+    },
+    "cta": {
+      "title": "Ești gata să transformi fluxul tău de documentație?",
+      "subtitle": "Începe gratuit. Nu este necesar card de credit.",
+      "button": "Începe acum"
+    }
+  },
+  "nav": {
+    "howItWorks": "Cum funcționează",
+    "features": "Funcționalități",
+    "pricing": "Prețuri",
+    "faq": "Întrebări frecvente"
+  },
+  "footer": {
+    "product": "Produs",
+    "company": "Companie",
+    "legal": "Legal",
+    "privacy": "Politica de confidențialitate",
+    "terms": "Termeni și condiții",
+    "about": "Despre noi",
+    "contact": "Contact",
+    "blog": "Blog",
+    "copyright": "© {year} DocFides. Toate drepturile rezervate."
+  },
+  "dashboard": {
+    "title": "Panou de control",
+    "newProject": "Proiect nou",
+    "noProjects": "Nu ai încă niciun proiect. Creează primul!",
+    "credits": {
+      "title": "Credite",
+      "used": "{used} / {total} utilizate",
+      "warning": "Ai folosit {percent}% din credite",
+      "exhausted": "Credite epuizate. Fă upgrade pentru a continua exportul."
+    },
+    "stats": {
+      "projects": "Proiecte luna aceasta",
+      "costPerDoc": "Cost mediu/document",
+      "timeSaved": "Ore economisite",
+      "recentActivity": "Activitate recentă"
+    }
+  },
+  "project": {
+    "new": "Proiect nou",
+    "name": "Numele proiectului",
+    "namePlaceholder": "Introdu numele proiectului...",
+    "create": "Creează proiect",
+    "status": {
+      "draft": "Ciornă",
+      "uploading": "Se încarcă",
+      "processing": "Se procesează",
+      "ready": "Gata",
+      "exported": "Exportat"
+    },
+    "upload": {
+      "title": "Încarcă documente",
+      "sourceLabel": "Documente sursă",
+      "sourceHint": "Contracte, cărți de identitate, documente financiare (max 10 fișiere, 25MB fiecare)",
+      "templateLabel": "Șablon",
+      "templateHint": "Șablonul de document de completat",
+      "modelLabel": "Document model (opțional)",
+      "modelHint": "Referință de stil doar — nu se vor extrage date factuale",
+      "filenameHint": "Sfat: Numește fișierele descriptiv (ex: CI_beneficiar_Popescu.pdf)",
+      "maxFiles": "Maximum {max} fișiere",
+      "maxSize": "Maximum {max}MB per fișier",
+      "acceptedFormats": "Acceptate: PDF, DOCX, XLSX, XLS, PNG, JPG, TIFF"
+    },
+    "processing": {
+      "title": "Procesare AI",
+      "steps": {
+        "extracting": "Se extrag datele din documente...",
+        "analyzing": "Se analizează stilul din documentul model...",
+        "mapping": "Se mapează datele pe câmpurile șablonului...",
+        "writing": "Se generează textul...",
+        "verifying": "Se verifică calitatea..."
+      },
+      "complete": "Procesare completă!",
+      "failed": "Procesarea a eșuat. Reîncearcă.",
+      "retryButton": "Reîncearcă procesarea"
+    },
+    "editor": {
+      "title": "Revizuiește și editează",
+      "field": "Câmp {number}",
+      "accept": "Acceptă",
+      "edit": "Editează",
+      "regenerate": "Regenerează",
+      "skip": "Sari",
+      "accepted": "Acceptat",
+      "skipped": "Sărit",
+      "modified": "Modificat",
+      "undoField": "Anulează",
+      "undoAll": "Anulează tot",
+      "confidenceHigh": "Încredere ridicată",
+      "confidenceMedium": "Încredere medie — revizuire recomandată",
+      "confidenceLow": "Încredere scăzută — revizuire manuală necesară",
+      "multipleSuggestions": "Entități multiple detectate — alege:",
+      "entitySource": "Sursă: {filename}"
+    },
+    "export": {
+      "title": "Exportă documentul",
+      "docx": "Exportă DOCX",
+      "pdf": "Exportă PDF",
+      "credits": "Aceasta va folosi {credits} credit(e)",
+      "downloading": "Se pregătește descărcarea...",
+      "success": "Document exportat cu succes!"
+    }
+  },
+  "admin": {
+    "title": "Panou de administrare",
+    "users": {
+      "title": "Gestionare utilizatori",
+      "email": "Email",
+      "plan": "Plan",
+      "credits": "Credite",
+      "status": "Status",
+      "actions": "Acțiuni",
+      "enable": "Activează",
+      "disable": "Dezactivează"
+    },
+    "stats": {
+      "title": "Statistici de utilizare",
+      "totalUsers": "Utilizatori totali",
+      "totalProjects": "Proiecte totale",
+      "totalExports": "Exporturi totale",
+      "aiCost": "Cost AI (luna aceasta)"
+    }
+  },
+  "auth": {
+    "signIn": {
+      "title": "Autentifică-te în DocFides",
+      "subtitle": "Continuă cu contul tău"
+    },
+    "signUp": {
+      "title": "Creează contul DocFides",
+      "subtitle": "Începe automatizarea documentației"
+    }
+  }
+}
