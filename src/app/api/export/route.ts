@@ -9,6 +9,8 @@ import { extractTextFromDocxBuffer } from '@/lib/docgen/docx-text-extractor';
 import { runExportAgent } from '@/lib/ai/export-agent';
 import { downloadFile } from '@/lib/storage/download';
 import { uploadFile, generateR2Key } from '@/lib/storage/upload';
+import { analyzePdfTemplate } from '@/lib/docgen/pdf-template-detector';
+import { fillPdfForm, fillFlatPdf, type PdfFieldPlacement } from '@/lib/docgen/pdf-form-filler';
 
 const exportSchema = z.object({
   projectId: z.string().min(1),
@@ -53,82 +55,98 @@ export async function POST(req: NextRequest) {
     const templateSchema = (project.templateSchema ?? {}) as Record<string, unknown>;
     const projectData = (project.projectData ?? {}) as Record<string, unknown>;
 
-    const generationInput = buildGenerationInput(
-      templateBuffer,
-      fieldCompletions,
-      draftPlan,
-      templateSchema,
-      projectData
-    );
+    const isPdfTemplate = templateDoc.mimeType === 'application/pdf';
 
-    // Generate DOCX
-    const docxBuffer = await generateDocx(generationInput);
-
-    // Validate generated DOCX before delivery
-    const validation = await validateExportedDocx(
-      docxBuffer,
-      Object.keys(generationInput.fieldValues)
-    );
-
-    if (!validation.valid) {
-      console.error('[EXPORT_POST] Generated DOCX failed validation:', validation.errors);
-      return NextResponse.json({
-        error: 'Document generation failed validation',
-        details: validation.errors,
-      }, { status: 500 });
-    }
-
-    if (validation.warnings.length > 0) {
-      console.warn(
-        `[EXPORT_POST] Generated DOCX has ${validation.warnings.length} warning(s):`,
-        validation.warnings.map((w) => w.message)
-      );
-    }
-
-    // AI Export Agent — final quality gate
-    // Extracts text from the generated DOCX and has Claude verify correctness
-    const generatedText = await extractTextFromDocxBuffer(docxBuffer);
-    const exportReview = await runExportAgent({
-      generatedDocumentText: generatedText,
-      projectData,
-      templateSchema,
-      mechanicalValidation: {
-        unreplacedPlaceholders: validation.stats.unreplacedPlaceholders,
-        warnings: validation.warnings.map((w) => w.message),
-      },
-    });
-
-    const exportApproval = exportReview.output as { approved?: boolean; score?: number; issues?: unknown[]; summary?: string };
-
-    if (exportApproval.approved === false) {
-      console.error(
-        `[EXPORT_POST] Export Agent rejected document (score: ${exportApproval.score}): ${exportApproval.summary}`
-      );
-      return NextResponse.json({
-        error: 'Export quality check failed',
-        summary: exportApproval.summary,
-        score: exportApproval.score,
-        issues: exportApproval.issues,
-      }, { status: 422 });
-    }
-
-    console.log(
-      `[EXPORT_POST] Export Agent approved (score: ${exportApproval.score}): ${exportApproval.summary}`
-    );
-
-    // Convert to PDF if needed
     let outputBuffer: Buffer;
     let contentType: string;
     let fileExtension: string;
 
-    if (body.format === 'pdf') {
-      outputBuffer = await convertDocxToPdf(docxBuffer);
-      contentType = 'application/pdf';
-      fileExtension = 'pdf';
+    if (isPdfTemplate) {
+      // === PDF TEMPLATE PATH ===
+      const pdfResult = await exportPdfTemplate({
+        templateBuffer,
+        fieldCompletions,
+        templateSchema,
+        projectData,
+        requestedFormat: body.format,
+      });
+      outputBuffer = pdfResult.buffer;
+      contentType = pdfResult.contentType;
+      fileExtension = pdfResult.fileExtension;
     } else {
-      outputBuffer = docxBuffer;
-      contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      fileExtension = 'docx';
+      // === DOCX TEMPLATE PATH (existing) ===
+      const generationInput = buildGenerationInput(
+        templateBuffer,
+        fieldCompletions,
+        draftPlan,
+        templateSchema,
+        projectData
+      );
+
+      // Generate DOCX
+      const docxBuffer = await generateDocx(generationInput);
+
+      // Validate generated DOCX before delivery
+      const validation = await validateExportedDocx(
+        docxBuffer,
+        Object.keys(generationInput.fieldValues)
+      );
+
+      if (!validation.valid) {
+        console.error('[EXPORT_POST] Generated DOCX failed validation:', validation.errors);
+        return NextResponse.json({
+          error: 'Document generation failed validation',
+          details: validation.errors,
+        }, { status: 500 });
+      }
+
+      if (validation.warnings.length > 0) {
+        console.warn(
+          `[EXPORT_POST] Generated DOCX has ${validation.warnings.length} warning(s):`,
+          validation.warnings.map((w) => w.message)
+        );
+      }
+
+      // AI Export Agent — final quality gate
+      const generatedText = await extractTextFromDocxBuffer(docxBuffer);
+      const exportReview = await runExportAgent({
+        generatedDocumentText: generatedText,
+        projectData,
+        templateSchema,
+        mechanicalValidation: {
+          unreplacedPlaceholders: validation.stats.unreplacedPlaceholders,
+          warnings: validation.warnings.map((w) => w.message),
+        },
+      });
+
+      const exportApproval = exportReview.output as { approved?: boolean; score?: number; issues?: unknown[]; summary?: string };
+
+      if (exportApproval.approved === false) {
+        console.error(
+          `[EXPORT_POST] Export Agent rejected document (score: ${exportApproval.score}): ${exportApproval.summary}`
+        );
+        return NextResponse.json({
+          error: 'Export quality check failed',
+          summary: exportApproval.summary,
+          score: exportApproval.score,
+          issues: exportApproval.issues,
+        }, { status: 422 });
+      }
+
+      console.log(
+        `[EXPORT_POST] Export Agent approved (score: ${exportApproval.score}): ${exportApproval.summary}`
+      );
+
+      // Convert to PDF if needed
+      if (body.format === 'pdf') {
+        outputBuffer = await convertDocxToPdf(docxBuffer);
+        contentType = 'application/pdf';
+        fileExtension = 'pdf';
+      } else {
+        outputBuffer = docxBuffer;
+        contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        fileExtension = 'docx';
+      }
     }
 
     // Build filenames — ASCII-safe for R2 key, UTF-8 for download
@@ -156,17 +174,7 @@ export async function POST(req: NextRequest) {
         format: body.format,
         r2Key,
         sizeBytes: outputBuffer.length,
-        validation: {
-          warnings: validation.warnings.length,
-          unreplacedPlaceholders: validation.stats.unreplacedPlaceholders,
-          paragraphs: validation.stats.totalParagraphs,
-          tables: validation.stats.totalTables,
-        },
-        exportAgent: {
-          approved: exportApproval.approved,
-          score: exportApproval.score,
-          issueCount: Array.isArray(exportApproval.issues) ? exportApproval.issues.length : 0,
-        },
+        templateType: isPdfTemplate ? 'pdf' : 'docx',
       },
     });
 
@@ -193,5 +201,108 @@ export async function POST(req: NextRequest) {
     }
     console.error('[EXPORT_POST]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/**
+ * Export path for PDF templates (AcroForm or flat PDF).
+ *
+ * Flow:
+ *  1. Detect if PDF has AcroForm fields
+ *  2a. AcroForm → fill fields directly using pdf-lib
+ *  2b. Flat PDF → use AI-determined coordinates to overlay text
+ *  3. Return filled PDF buffer
+ *
+ * For PDF templates, the output is always PDF (no DOCX conversion).
+ */
+async function exportPdfTemplate(input: {
+  templateBuffer: Buffer;
+  fieldCompletions: Record<string, unknown>;
+  templateSchema: Record<string, unknown>;
+  projectData: Record<string, unknown>;
+  requestedFormat: 'docx' | 'pdf';
+}): Promise<{ buffer: Buffer; contentType: string; fileExtension: string }> {
+  const pdfAnalysis = await analyzePdfTemplate(input.templateBuffer);
+
+  // Extract field values from pipeline completions
+  const completions = input.fieldCompletions as Record<string, string>;
+  const schema = input.templateSchema as {
+    templateType?: string;
+    fields?: Array<{
+      id: string;
+      acroFieldName?: string;
+      pdfPlacement?: { page: number; x: number; y: number; width: number; fontSize: number; multiline?: boolean };
+    }>;
+  };
+
+  if (pdfAnalysis.type === 'acroform') {
+    // Direct AcroForm fill
+    const fieldValues: Record<string, string> = {};
+    const checkboxValues: Record<string, boolean> = {};
+
+    for (const schemaField of schema.fields ?? []) {
+      const value = completions[schemaField.id];
+      if (!value) continue;
+
+      const acroName = schemaField.acroFieldName ?? schemaField.id;
+
+      // Check if the matching PDF field is a checkbox
+      const pdfField = pdfAnalysis.fields.find((f) => f.name === acroName);
+      if (pdfField?.type === 'checkbox') {
+        checkboxValues[acroName] = value.toLowerCase() === 'true' || value === 'da' || value === '1';
+      } else {
+        fieldValues[acroName] = value;
+      }
+    }
+
+    const result = await fillPdfForm({
+      templateBuffer: input.templateBuffer,
+      fieldValues,
+      checkboxValues,
+      flatten: true,
+    });
+
+    console.log(
+      `[EXPORT_PDF] AcroForm: filled ${result.filledFields}/${result.totalFields} fields`
+    );
+
+    return {
+      buffer: result.buffer,
+      contentType: 'application/pdf',
+      fileExtension: 'pdf',
+    };
+  } else {
+    // Flat PDF — use coordinate-based text overlay
+    const placements: PdfFieldPlacement[] = [];
+
+    for (const schemaField of schema.fields ?? []) {
+      const value = completions[schemaField.id];
+      if (!value || !schemaField.pdfPlacement) continue;
+
+      const p = schemaField.pdfPlacement;
+      placements.push({
+        fieldId: schemaField.id,
+        value,
+        page: p.page,
+        x: p.x,
+        y: p.y,
+        fontSize: p.fontSize ?? 10,
+        multiline: p.multiline,
+        maxWidth: p.width,
+      });
+    }
+
+    const buffer = await fillFlatPdf({
+      templateBuffer: input.templateBuffer,
+      fieldPlacements: placements,
+    });
+
+    console.log(`[EXPORT_PDF] Flat PDF: placed ${placements.length} fields`);
+
+    return {
+      buffer,
+      contentType: 'application/pdf',
+      fileExtension: 'pdf',
+    };
   }
 }

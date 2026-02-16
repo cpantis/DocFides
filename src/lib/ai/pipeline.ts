@@ -250,8 +250,8 @@ async function runParserStage(projectId: string): Promise<AgentResult> {
     };
   }
 
-  let totalInputTokens = 0;
-  let totalOutputTokens = 0;
+  const totalInputTokens = 0;
+  const totalOutputTokens = 0;
   const results: Array<{ filename: string; role: string; status: string; chars?: number }> = [];
 
   for (const doc of docs) {
@@ -430,6 +430,56 @@ async function runStage(
       if (!templateDoc) {
         throw new Error('No extracted template document found for template stage');
       }
+
+      // Check if template is a PDF (needs special handling)
+      const { connectToDatabase: connectDb, DocumentModel: DocModel } = await import('@/lib/db');
+      await connectDb();
+      const templateDocRecord = await DocModel.findOne({
+        projectId: context.projectId,
+        role: 'template',
+        status: 'extracted',
+      });
+
+      const isPdf = templateDocRecord?.mimeType === 'application/pdf';
+
+      if (isPdf && templateDocRecord) {
+        // Analyze PDF template: detect AcroForm fields, determine type
+        const { analyzePdfTemplate } = await import('@/lib/docgen/pdf-template-detector');
+
+        let templateBuffer: Buffer;
+        try {
+          const { downloadFile } = await import('@/lib/storage/download');
+          templateBuffer = await downloadFile(templateDocRecord.r2Key);
+        } catch {
+          const { downloadFileLocal } = await import('@/lib/storage/dev-storage');
+          templateBuffer = await downloadFileLocal(templateDocRecord.r2Key);
+        }
+
+        const pdfAnalysis = await analyzePdfTemplate(templateBuffer);
+
+        console.log(
+          `[Pipeline] PDF template detected: ${pdfAnalysis.type}, ${pdfAnalysis.fields.length} form fields`
+        );
+
+        if (pdfAnalysis.type === 'acroform') {
+          return runTemplateAgent({
+            content: templateDoc.content,
+            templateType: 'acroform',
+            pdfFormFields: pdfAnalysis.fields,
+          });
+        } else {
+          // Flat PDF — render pages as images for Claude Vision analysis
+          const { renderPdfPagesAsImages } = await import('@/lib/docgen/pdf-page-renderer');
+          const pageImages = await renderPdfPagesAsImages(templateBuffer, pdfAnalysis.pageCount);
+          return runTemplateAgent({
+            content: templateDoc.content,
+            templateType: 'flat_pdf',
+            pageImages,
+          });
+        }
+      }
+
+      // Default: DOCX template
       return runTemplateAgent(templateDoc.content);
     }
 

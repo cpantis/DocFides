@@ -194,6 +194,7 @@
   "dashboard": {
     "title": "Panou de control",
     "newProject": "Proiect nou",
+    "projectsHeading": "Proiecte",
     "noProjects": "Nu ai încă niciun proiect. Creează primul!",
     "credits": {
       "title": "Credite",

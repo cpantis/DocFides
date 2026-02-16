@@ -18,8 +18,15 @@ export function DashboardContent() {
   const { stats } = useUserStats();
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/projects/${id}`, { method: 'DELETE' });
-    mutate();
+    try {
+      const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        console.error(`[Dashboard] Delete failed for project ${id}: ${res.status}`);
+      }
+      mutate();
+    } catch (error) {
+      console.error('[Dashboard] Delete request failed:', error);
+    }
   };
 
   return (
@@ -61,7 +68,7 @@ export function DashboardContent() {
         {/* Projects list */}
         <div className="mt-10">
           <h2 className="font-heading text-lg font-semibold text-gray-900">
-            Projects
+            {t('projectsHeading')}
           </h2>
 
           {isLoading ? (

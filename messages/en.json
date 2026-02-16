@@ -194,6 +194,7 @@
   "dashboard": {
     "title": "Dashboard",
     "newProject": "New Project",
+    "projectsHeading": "Projects",
     "noProjects": "No projects yet. Create your first one!",
     "credits": {
       "title": "Credits",
