@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth/mock-auth';
+import { auth, ensureDevUser } from '@/lib/auth/mock-auth';
 import { connectToDatabase, User, Project, Generation } from '@/lib/db';
 
 export async function GET() {
@@ -8,6 +8,7 @@ export async function GET() {
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     await connectToDatabase();
+    await ensureDevUser();
 
     const user = await User.findOne({ clerkId: userId });
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });

@@ -21,3 +21,23 @@ export const MOCK_USER = {
   name: 'Dev User',
   email: 'dev@docfides.pro',
 } as const;
+
+/**
+ * Ensures the dev user exists in MongoDB.
+ * Call this from API routes that need a User document (e.g., /api/user/stats).
+ */
+export async function ensureDevUser(): Promise<void> {
+  const { connectToDatabase, User } = await import('@/lib/db');
+  await connectToDatabase();
+
+  const existing = await User.findOne({ clerkId: MOCK_USER_ID });
+  if (!existing) {
+    await User.create({
+      clerkId: MOCK_USER_ID,
+      email: MOCK_USER.email,
+      name: MOCK_USER.name,
+      role: 'user',
+      plan: 'free',
+    });
+  }
+}
