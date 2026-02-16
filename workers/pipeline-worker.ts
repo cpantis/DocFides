@@ -27,17 +27,42 @@ export const pipelineWorker = new Worker<PipelineJobData>(
       throw new Error(`Project not found: ${projectId}`);
     }
 
-    // Check all source documents are extracted before running pipeline
+    // Check source documents — allow partial extraction (at least one must be ready)
     const sourceDocs = await DocumentModel.find({
       projectId,
       role: 'source',
       status: { $ne: 'deleted' },
     });
 
-    const unextracted = sourceDocs.filter((d) => d.status !== 'extracted');
-    if (unextracted.length > 0) {
-      throw new Error(
-        `${unextracted.length} source documents not yet extracted. Wait for OCR to complete.`
+    const extracted = sourceDocs.filter((d) => d.status === 'extracted');
+    const failed = sourceDocs.filter((d) => d.status === 'failed');
+    const pending = sourceDocs.filter((d) => d.status !== 'extracted' && d.status !== 'failed');
+
+    if (extracted.length === 0) {
+      const total = sourceDocs.length;
+      if (total === 0) {
+        throw new Error('No source documents uploaded. Upload at least one source document.');
+      } else if (failed.length === total) {
+        throw new Error(`All ${total} source documents failed extraction. Check the parsing service and re-upload.`);
+      } else {
+        throw new Error(
+          `No source documents are ready yet (${pending.length} still processing, ${failed.length} failed). Wait for OCR to complete.`
+        );
+      }
+    }
+
+    // Log partial extraction warnings
+    if (failed.length > 0) {
+      console.warn(
+        `[Pipeline] Proceeding with ${extracted.length}/${sourceDocs.length} extracted documents. ` +
+        `${failed.length} document(s) failed and will be skipped: ` +
+        failed.map((d) => d.originalFilename).join(', ')
+      );
+    }
+    if (pending.length > 0) {
+      console.warn(
+        `[Pipeline] ${pending.length} document(s) still processing and will be skipped: ` +
+        pending.map((d) => d.originalFilename).join(', ')
       );
     }
 
@@ -77,7 +102,7 @@ export const pipelineWorker = new Worker<PipelineJobData>(
       userId,
       projectId,
       action: 'pipeline_completed',
-      details: {},
+      details: { extractedDocs: extracted.length, totalDocs: sourceDocs.length },
     });
 
     console.log(`[Pipeline] Completed project ${projectId}`);

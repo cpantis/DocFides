@@ -26,20 +26,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Pipeline already running' }, { status: 409 });
     }
 
-    // Run pipeline in the background (fire-and-forget)
-    // This works in dev mode where the server stays alive
-    runPipelineBackground(body.projectId, userId).catch((error) => {
-      console.error('[PIPELINE_BACKGROUND]', error);
-    });
+    // Try to queue via BullMQ (Redis). If Redis is unavailable, fall back to inline execution.
+    let dispatched: 'queued' | 'inline' = 'inline';
+
+    try {
+      const { checkRedisHealth } = await import('@/lib/queue/connection');
+      const redisAvailable = await checkRedisHealth();
+
+      if (redisAvailable) {
+        const { getPipelineQueue } = await import('@/lib/queue/queues');
+        const queue = getPipelineQueue();
+        await queue.add('pipeline', { projectId: body.projectId, userId }, {
+          attempts: 1,
+          removeOnComplete: true,
+        });
+        dispatched = 'queued';
+        console.log(`[PIPELINE] Job queued via BullMQ for project ${body.projectId}`);
+      } else {
+        console.warn('[PIPELINE] Redis unavailable — falling back to inline execution');
+      }
+    } catch (queueError) {
+      console.warn('[PIPELINE] Failed to queue via BullMQ, falling back to inline:', queueError);
+    }
+
+    // Fallback: run directly in background (fire-and-forget)
+    if (dispatched === 'inline') {
+      runPipelineBackground(body.projectId, userId).catch((error) => {
+        console.error('[PIPELINE_BACKGROUND]', error);
+      });
+    }
 
     await Audit.create({
       userId,
       projectId: body.projectId,
       action: 'pipeline_started',
-      details: {},
+      details: { dispatched },
     });
 
-    return NextResponse.json({ data: { status: 'queued', projectId: body.projectId } });
+    return NextResponse.json({ data: { status: dispatched, projectId: body.projectId } });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 });

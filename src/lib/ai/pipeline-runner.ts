@@ -59,11 +59,46 @@ function validateAnthropicKey(): { valid: boolean; reason?: string } {
 }
 
 /**
+ * Fail the pipeline early with a clear error message.
+ * Sets status to 'draft' so the user can retry after fixing the issue.
+ */
+async function failPipelineEarly(
+  projectId: string,
+  userId: string,
+  errorMessage: string
+): Promise<void> {
+  const { Project, Audit } = await import('@/lib/db');
+
+  console.error(`[Pipeline] Cannot start: ${errorMessage}`);
+
+  await Project.findByIdAndUpdate(projectId, {
+    $set: {
+      status: 'draft',
+      pipelineProgress: [{
+        stage: 'extractor',
+        status: 'failed',
+        error: errorMessage,
+        completedAt: new Date(),
+      }],
+    },
+  });
+
+  await Audit.create({
+    userId,
+    projectId,
+    action: 'pipeline_failed',
+    details: { stage: 'extractor', error: errorMessage },
+  });
+}
+
+/**
  * Run the pipeline for a project in the background.
  * Updates pipelineProgress on the project document as each stage runs.
  *
- * Requires a valid ANTHROPIC_API_KEY — does NOT use mock/simulated data.
- * If the AI is unavailable, the pipeline fails with a clear error message.
+ * Pre-flight checks:
+ * 1. Valid ANTHROPIC_API_KEY
+ * 2. Parsing service is reachable
+ * 3. At least one source document is extracted (partial extraction is OK)
  */
 export async function runPipelineBackground(
   projectId: string,
@@ -77,32 +112,57 @@ export async function runPipelineBackground(
     throw new Error(`Project not found: ${projectId}`);
   }
 
-  // Validate AI availability before starting
+  // Pre-flight check 1: Validate API key
   const keyCheck = validateAnthropicKey();
   if (!keyCheck.valid) {
-    console.error(`[Pipeline] Cannot start: ${keyCheck.reason}`);
-
-    // Set a single failed stage so the UI shows the error
-    await Project.findByIdAndUpdate(projectId, {
-      $set: {
-        status: 'draft',
-        pipelineProgress: [{
-          stage: 'extractor',
-          status: 'failed',
-          error: keyCheck.reason,
-          completedAt: new Date(),
-        }],
-      },
-    });
-
-    await Audit.create({
-      userId,
-      projectId,
-      action: 'pipeline_failed',
-      details: { stage: 'extractor', error: keyCheck.reason },
-    });
-
+    await failPipelineEarly(projectId, userId, keyCheck.reason!);
     return;
+  }
+
+  // Pre-flight check 2: Parsing service health
+  const { checkParsingServiceHealth } = await import('@/lib/parsing/detector');
+  const parsingHealthy = await checkParsingServiceHealth();
+  if (!parsingHealthy) {
+    await failPipelineEarly(
+      projectId,
+      userId,
+      'Parsing service is unavailable. Make sure the parsing service is running (docker-compose up parsing-service) and accessible.'
+    );
+    return;
+  }
+
+  // Pre-flight check 3: At least one source document extracted (partial is OK)
+  const sourceDocs = await DocumentModel.find({
+    projectId,
+    role: 'source',
+    status: { $ne: 'deleted' },
+  });
+
+  const extracted = sourceDocs.filter((d) => d.status === 'extracted');
+  const failed = sourceDocs.filter((d) => d.status === 'failed');
+
+  if (extracted.length === 0) {
+    const totalCount = sourceDocs.length;
+    const failedCount = failed.length;
+    let errorMsg = 'No source documents have been extracted yet.';
+    if (totalCount === 0) {
+      errorMsg = 'No source documents uploaded. Upload at least one source document before running the pipeline.';
+    } else if (failedCount === totalCount) {
+      errorMsg = `All ${totalCount} source documents failed extraction. Check the parsing service and re-upload.`;
+    } else {
+      errorMsg = `No source documents are ready yet (${totalCount - failedCount} still processing, ${failedCount} failed). Wait for OCR to complete.`;
+    }
+    await failPipelineEarly(projectId, userId, errorMsg);
+    return;
+  }
+
+  // Warn about skipped documents but proceed
+  if (failed.length > 0) {
+    console.warn(
+      `[Pipeline] Proceeding with ${extracted.length}/${sourceDocs.length} extracted documents. ` +
+      `${failed.length} document(s) failed extraction and will be skipped: ` +
+      failed.map((d) => d.originalFilename).join(', ')
+    );
   }
 
   // Determine which stages to run (skip model if no model documents)
@@ -126,7 +186,7 @@ export async function runPipelineBackground(
     $set: { pipelineProgress, status: 'processing' },
   });
 
-  console.log(`[Pipeline] Starting real AI pipeline for project ${projectId}`);
+  console.log(`[Pipeline] Starting AI pipeline for project ${projectId} (${extracted.length} source docs)`);
 
   for (const stage of stages) {
     // Mark stage as running
