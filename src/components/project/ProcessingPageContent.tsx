@@ -94,6 +94,7 @@ export function ProcessingPageContent({ projectId }: ProcessingPageContentProps)
         id: s.stage,
         translationKey: STAGE_TRANSLATION_MAP[s.stage] ?? s.stage,
         status: s.status === 'queued' ? ('pending' as const) : s.status,
+        error: s.error,
       }))
     : [
         { id: 'extractor', translationKey: 'extracting', status: 'pending' as const },

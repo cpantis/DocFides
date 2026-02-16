@@ -1,18 +1,9 @@
 /**
  * Background pipeline runner that updates stage progress in MongoDB.
- * Falls back to simulation mode when ANTHROPIC_API_KEY is not set.
+ * Requires ANTHROPIC_API_KEY to be set — fails clearly if AI is unavailable.
  */
 
-import { PIPELINE_STAGES_ORDER, type PipelineStage } from '@/types/pipeline';
-
-const SIMULATION_DELAYS: Record<PipelineStage, number> = {
-  extractor: 4000,
-  model: 3000,
-  template: 3000,
-  mapping: 3500,
-  writing: 5000,
-  verification: 3500,
-};
+import { PIPELINE_STAGES_ORDER } from '@/types/pipeline';
 
 async function updateStageProgress(
   projectId: string,
@@ -43,26 +34,36 @@ async function updateStageProgress(
   );
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /**
- * Check if the real AI pipeline can be used.
- * Returns false if key is missing, empty, or a placeholder value.
+ * Validate that ANTHROPIC_API_KEY is configured and not a placeholder.
+ * Returns { valid: true } or { valid: false, reason: string }.
  */
-function hasAnthropicKey(): boolean {
+function validateAnthropicKey(): { valid: boolean; reason?: string } {
   const key = process.env.ANTHROPIC_API_KEY;
-  if (!key || key.length < 10) return false;
-  // Detect placeholder values
+
+  if (!key || key.trim().length === 0) {
+    return { valid: false, reason: 'ANTHROPIC_API_KEY is not set in environment variables' };
+  }
+
+  if (key.length < 10) {
+    return { valid: false, reason: 'ANTHROPIC_API_KEY appears to be too short — check your .env.local' };
+  }
+
   const placeholders = ['LIPSESTE', 'MISSING', 'PLACEHOLDER', 'your-key', 'sk-ant-xxx'];
-  return !placeholders.some((p) => key.includes(p));
+  const found = placeholders.find((p) => key.includes(p));
+  if (found) {
+    return { valid: false, reason: `ANTHROPIC_API_KEY contains placeholder value "${found}" — set a real API key in .env.local` };
+  }
+
+  return { valid: true };
 }
 
 /**
  * Run the pipeline for a project in the background.
  * Updates pipelineProgress on the project document as each stage runs.
- * Falls back to simulation if ANTHROPIC_API_KEY is not available.
+ *
+ * Requires a valid ANTHROPIC_API_KEY — does NOT use mock/simulated data.
+ * If the AI is unavailable, the pipeline fails with a clear error message.
  */
 export async function runPipelineBackground(
   projectId: string,
@@ -74,6 +75,34 @@ export async function runPipelineBackground(
   const project = await Project.findById(projectId);
   if (!project) {
     throw new Error(`Project not found: ${projectId}`);
+  }
+
+  // Validate AI availability before starting
+  const keyCheck = validateAnthropicKey();
+  if (!keyCheck.valid) {
+    console.error(`[Pipeline] Cannot start: ${keyCheck.reason}`);
+
+    // Set a single failed stage so the UI shows the error
+    await Project.findByIdAndUpdate(projectId, {
+      $set: {
+        status: 'draft',
+        pipelineProgress: [{
+          stage: 'extractor',
+          status: 'failed',
+          error: keyCheck.reason,
+          completedAt: new Date(),
+        }],
+      },
+    });
+
+    await Audit.create({
+      userId,
+      projectId,
+      action: 'pipeline_failed',
+      details: { stage: 'extractor', error: keyCheck.reason },
+    });
+
+    return;
   }
 
   // Determine which stages to run (skip model if no model documents)
@@ -97,10 +126,7 @@ export async function runPipelineBackground(
     $set: { pipelineProgress, status: 'processing' },
   });
 
-  const useRealPipeline = hasAnthropicKey();
-  console.log(
-    `[Pipeline] Starting ${useRealPipeline ? 'real' : 'simulated'} pipeline for project ${projectId}`
-  );
+  console.log(`[Pipeline] Starting real AI pipeline for project ${projectId}`);
 
   for (const stage of stages) {
     // Mark stage as running
@@ -108,31 +134,32 @@ export async function runPipelineBackground(
     console.log(`[Pipeline] Running ${stage}...`);
 
     try {
-      if (useRealPipeline) {
-        // Try real AI pipeline stage, fallback to mock on failure
-        try {
-          const { runPipeline } = await import('@/lib/ai/pipeline');
-          await runPipeline(projectId, stage);
-        } catch (aiError) {
-          console.warn(`[Pipeline] Real AI failed for ${stage}, falling back to mock:`, aiError);
-          await runMockStage(stage, projectId, Project);
-        }
-      } else {
-        // Simulate with delay + save mock data
-        await runMockStage(stage, projectId, Project);
-      }
+      const { runPipeline } = await import('@/lib/ai/pipeline');
+      await runPipeline(projectId, stage);
 
       // Mark stage as completed
       await updateStageProgress(projectId, stage, 'completed');
       console.log(`[Pipeline] ${stage} completed`);
     } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+
+      // Provide user-friendly error messages
+      let userMessage = errorMsg;
+      const status = (error as { status?: number }).status;
+      if (status === 401) {
+        userMessage = 'ANTHROPIC_API_KEY is invalid or expired. Check your API key in .env.local';
+      } else if (status === 429) {
+        userMessage = 'Anthropic API rate limit exceeded. Please wait a few minutes and retry.';
+      } else if (status === 529) {
+        userMessage = 'Anthropic API is temporarily overloaded. Please retry later.';
+      } else if (errorMsg.includes('fetch failed') || errorMsg.includes('ENOTFOUND') || errorMsg.includes('ECONNREFUSED')) {
+        userMessage = 'Cannot connect to Anthropic API. Check your internet connection.';
+      } else if (errorMsg.includes('No extracted')) {
+        userMessage = `${errorMsg}. Make sure documents were uploaded and extracted successfully before processing.`;
+      }
+
       console.error(`[Pipeline] ${stage} failed:`, error);
-      await updateStageProgress(
-        projectId,
-        stage,
-        'failed',
-        error instanceof Error ? error.message : String(error)
-      );
+      await updateStageProgress(projectId, stage, 'failed', userMessage);
 
       // Reset project status so user can retry
       await Project.findByIdAndUpdate(projectId, { $set: { status: 'draft' } });
@@ -141,7 +168,7 @@ export async function runPipelineBackground(
         userId,
         projectId,
         action: 'pipeline_failed',
-        details: { stage, error: error instanceof Error ? error.message : String(error) },
+        details: { stage, error: errorMsg },
       });
 
       return;
@@ -155,29 +182,8 @@ export async function runPipelineBackground(
     userId,
     projectId,
     action: 'pipeline_completed',
-    details: { simulated: !useRealPipeline },
+    details: {},
   });
 
   console.log(`[Pipeline] Completed project ${projectId}`);
-}
-
-/**
- * Run a mock/simulated stage with delay and save mock data.
- */
-async function runMockStage(
-  stage: PipelineStage,
-  projectId: string,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Project: any
-): Promise<void> {
-  await sleep(SIMULATION_DELAYS[stage]);
-
-  const { getMockStageOutput, getStageOutputField } = await import('@/lib/ai/mock-pipeline-data');
-  const outputField = getStageOutputField(stage);
-  if (outputField) {
-    const mockOutput = getMockStageOutput(stage);
-    await Project.findByIdAndUpdate(projectId, {
-      $set: { [outputField]: mockOutput },
-    });
-  }
 }
