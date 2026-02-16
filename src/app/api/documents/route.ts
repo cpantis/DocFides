@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { connectToDatabase, DocumentModel, Project } from '@/lib/db';
 import { uploadDocumentSchema, validateFileSize, validateMimeType, MAX_SOURCE_FILES, MAX_MODEL_FILES } from '@/lib/utils/validation';
 import { hashFile } from '@/lib/utils/hash';
-import { uploadFile, generateR2Key } from '@/lib/storage/upload';
-import { getOcrQueue } from '@/lib/queue/queues';
+import { generateR2Key } from '@/lib/storage/upload';
+import { isR2Configured, uploadFileLocal } from '@/lib/storage/dev-storage';
 
 export async function POST(req: NextRequest) {
   try {
@@ -60,9 +60,21 @@ export async function POST(req: NextRequest) {
     const sha256 = await hashFile(buffer);
     const r2Key = generateR2Key(userId, projectId, file.name);
 
-    await uploadFile(r2Key, buffer, file.type);
+    // Upload to R2 or local filesystem
+    const useR2 = isR2Configured();
+    if (useR2) {
+      const { uploadFile } = await import('@/lib/storage/upload');
+      await uploadFile(r2Key, buffer, file.type);
+    } else {
+      console.log('[DOCUMENTS_POST] R2 not configured, using local storage');
+      await uploadFileLocal(r2Key, buffer, file.type);
+    }
 
     const format = file.name.split('.').pop()?.toLowerCase() ?? 'unknown';
+
+    // In dev mode without R2/OCR, mark documents as 'extracted' immediately
+    const initialStatus = useR2 ? 'uploaded' : 'extracted';
+
     const doc = await DocumentModel.create({
       projectId,
       userId,
@@ -73,6 +85,7 @@ export async function POST(req: NextRequest) {
       sha256,
       r2Key,
       mimeType: file.type,
+      status: initialStatus,
       deleteAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
     });
 
@@ -85,9 +98,10 @@ export async function POST(req: NextRequest) {
       await Project.findByIdAndUpdate(projectId, { $push: { modelDocuments: doc._id } });
     }
 
-    // Queue OCR/parsing job for source and template documents
-    if (role === 'source' || role === 'template') {
+    // Queue OCR/parsing job only when R2 + Redis are configured
+    if (useR2 && (role === 'source' || role === 'template')) {
       try {
+        const { getOcrQueue } = await import('@/lib/queue/queues');
         const ocrQueue = getOcrQueue();
         await ocrQueue.add(
           `ocr-${doc._id}`,
@@ -105,7 +119,6 @@ export async function POST(req: NextRequest) {
           }
         );
       } catch (queueError) {
-        // Queue failure shouldn't block upload — document is saved, OCR can be retried
         console.error('[DOCUMENTS_POST] Failed to queue OCR job:', queueError);
       }
     }
