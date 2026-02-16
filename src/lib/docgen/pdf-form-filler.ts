@@ -37,7 +37,10 @@ export async function fillPdfForm(input: PdfFormFillInput): Promise<PdfFormFillR
   const pdfDoc = await PDFDocument.load(input.templateBuffer, { ignoreEncryption: true });
   const form = pdfDoc.getForm();
 
-  // Embed a font that supports Romanian diacritics
+  // Embed Helvetica as fallback. Note: StandardFonts don't support full Romanian
+  // diacritics (ș ț). For production use with Romanian text, a custom font with
+  // full Unicode coverage (e.g., embedded NotoSans) should be used instead.
+  // TODO: embed custom font with Romanian diacritic support (ș ț ă â î)
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
   const allFields = form.getFields();
@@ -123,6 +126,7 @@ export async function fillFlatPdf(input: {
   flatten?: boolean;
 }): Promise<Buffer> {
   const pdfDoc = await PDFDocument.load(input.templateBuffer, { ignoreEncryption: true });
+  // TODO: embed custom font with Romanian diacritic support (ș ț ă â î)
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   const pages = pdfDoc.getPages();
 

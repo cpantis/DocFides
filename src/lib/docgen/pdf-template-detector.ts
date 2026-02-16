@@ -89,7 +89,7 @@ export async function analyzePdfTemplate(pdfBuffer: Buffer): Promise<PdfTemplate
     if (fieldType === 'text') {
       try {
         const textField = form.getTextField(name);
-        pdfField.currentValue = textField.getText() ?? undefined;
+        pdfField.currentValue = textField.getText() || undefined;
       } catch (error) {
         console.warn(`[PdfDetector] Could not read text field "${name}":`, error instanceof Error ? error.message : error);
       }
