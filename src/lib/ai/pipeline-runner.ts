@@ -119,16 +119,17 @@ export async function runPipelineBackground(
     return;
   }
 
-  // Pre-flight check 2: Parsing service health
-  const { checkParsingServiceHealth } = await import('@/lib/parsing/detector');
-  const parsingHealthy = await checkParsingServiceHealth();
-  if (!parsingHealthy) {
-    await failPipelineEarly(
-      projectId,
-      userId,
-      'Parsing service is unavailable. Make sure the parsing service is running (docker-compose up parsing-service) and accessible.'
-    );
-    return;
+  // Pre-flight check 2: Parsing service health (warning only — Node.js native parsers are the fallback)
+  try {
+    const { checkParsingServiceHealth } = await import('@/lib/parsing/detector');
+    const parsingHealthy = await checkParsingServiceHealth();
+    if (!parsingHealthy) {
+      console.warn(
+        '[Pipeline] Python parsing service is unavailable — Node.js native parsers (pdf-parse, mammoth, tesseract.js, xlsx) will be used as fallback.'
+      );
+    }
+  } catch {
+    console.warn('[Pipeline] Could not check parsing service health — continuing with Node.js native parsers.');
   }
 
   // Pre-flight check 3: At least one source document extracted (partial is OK)

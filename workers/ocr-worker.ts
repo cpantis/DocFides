@@ -21,7 +21,9 @@ export const ocrWorker = new Worker<OcrJobData>(
 
     const { connectToDatabase, DocumentModel, Extraction, Audit } = await import('../src/lib/db');
     const { downloadFile } = await import('../src/lib/storage/download');
-    const { parseDocument } = await import('../src/lib/parsing/detector');
+    // Use parse-pipeline which tries Python first, then falls back to Node.js
+    // native extractors (pdf-parse, mammoth, xlsx, tesseract.js)
+    const { parseDocument } = await import('../src/lib/parsing/parse-pipeline');
     const { calculateOverallConfidence } = await import('../src/lib/parsing/confidence');
 
     await connectToDatabase();
@@ -56,7 +58,7 @@ export const ocrWorker = new Worker<OcrJobData>(
     const fileBuffer = await downloadFile(r2Key);
     await job.updateProgress(25);
 
-    // 4. Send to Python parsing service
+    // 4. Parse document (Python → Node.js fallback)
     console.log(`[OCR] Parsing ${filename}...`);
     const parseResult = await parseDocument(fileBuffer, filename, mimeType);
     await job.updateProgress(75);
