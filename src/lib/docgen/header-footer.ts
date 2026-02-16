@@ -2,10 +2,15 @@
  * Header/footer placeholder replacement for DOCX export.
  * Processes word/header*.xml and word/footer*.xml files in the DOCX ZIP,
  * replacing placeholders while preserving font/size/alignment.
+ *
+ * Uses the same split-run merging logic as template-filler to handle
+ * Word's tendency to split {{placeholder}} across multiple <w:r> elements.
+ *
  * [Page] and [Total Pages] are native DOCX field codes — left untouched.
  */
 
 import type JSZip from 'jszip';
+import { replaceTextPlaceholders, type PlaceholderReplacement } from './template-filler';
 
 export interface HeaderFooterReplacement {
   placeholder: string;
@@ -14,7 +19,7 @@ export interface HeaderFooterReplacement {
 
 /**
  * Process all header and footer XML files in the DOCX ZIP.
- * Replaces placeholder text in <w:t> elements.
+ * Merges split runs and replaces placeholder text in <w:t> elements.
  */
 export async function processHeadersFooters(
   zip: JSZip,
@@ -29,26 +34,21 @@ export async function processHeadersFooters(
     (f) => /^word\/(header|footer)\d*\.xml$/.test(f)
   );
 
+  // Convert to PlaceholderReplacement format (headers are never narrative)
+  const placeholderReplacements: PlaceholderReplacement[] = replacements.map(
+    ({ placeholder, value }) => ({ placeholder, value, isNarrative: false })
+  );
+
   for (const filePath of headerFooterFiles) {
     const file = zip.file(filePath);
     if (!file) continue;
 
     let xml = await file.async('string');
 
-    for (const { placeholder, value } of replacements) {
-      const escapedValue = escapeXml(value);
-      xml = xml.replaceAll(placeholder, escapedValue);
-    }
+    // Use the same merge+replace logic as template-filler
+    // This handles split-run placeholders that simple replaceAll would miss
+    xml = replaceTextPlaceholders(xml, placeholderReplacements);
 
     zip.file(filePath, xml);
   }
-}
-
-function escapeXml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;');
 }
