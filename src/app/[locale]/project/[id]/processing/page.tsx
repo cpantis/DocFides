@@ -1,16 +1,16 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+import { ProcessingPageContent } from '@/components/project/ProcessingPageContent';
 
-export default async function ProcessingPage() {
+export default async function ProcessingPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
-  return (
-    <div className="mx-auto max-w-4xl px-6 py-10">
-      <h1 className="font-heading text-2xl font-bold text-gray-900">
-        AI Processing
-      </h1>
-      {/* ProcessingProgress component will go here */}
-    </div>
-  );
+  const { id } = await params;
+
+  return <ProcessingPageContent projectId={id} />;
 }

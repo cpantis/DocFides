@@ -1,16 +1,16 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
+import { EditorPageContent } from '@/components/project/EditorPageContent';
 
-export default async function EditorPage() {
+export default async function EditorPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { userId } = await auth();
   if (!userId) redirect('/sign-in');
 
-  return (
-    <div className="h-screen">
-      {/* SplitScreen editor will go here */}
-      <div className="flex items-center justify-center h-full text-gray-500">
-        Split-screen editor placeholder
-      </div>
-    </div>
-  );
+  const { id } = await params;
+
+  return <EditorPageContent projectId={id} />;
 }
