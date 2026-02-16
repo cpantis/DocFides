@@ -72,9 +72,7 @@ export async function POST(req: NextRequest) {
 
     const format = file.name.split('.').pop()?.toLowerCase() ?? 'unknown';
 
-    // In dev mode without R2/OCR, mark documents as 'extracted' immediately
-    const initialStatus = useR2 ? 'uploaded' : 'extracted';
-
+    // Always start as 'uploaded' — only mark 'extracted' after successful extraction
     const doc = await DocumentModel.create({
       projectId,
       userId,
@@ -85,7 +83,7 @@ export async function POST(req: NextRequest) {
       sha256,
       r2Key,
       mimeType: file.type,
-      status: initialStatus,
+      status: 'uploaded',
       deleteAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
     });
 
@@ -136,18 +134,23 @@ export async function POST(req: NextRequest) {
           sha256
         );
 
-        // Delete original file after successful extraction — only structured data is kept
+        // Mark as extracted only after successful extraction
+        await DocumentModel.findByIdAndUpdate(doc._id, { status: 'extracted' });
+
+        // Delete original file — only structured data is kept
         try {
           const { deleteFileLocal } = await import('@/lib/storage/dev-storage');
           await deleteFileLocal(r2Key);
-          console.log('[DOCUMENTS_POST] Original file deleted after extraction:', r2Key);
         } catch (cleanupError) {
           console.error('[DOCUMENTS_POST] File cleanup failed (non-fatal):', cleanupError);
         }
       } catch (extractError) {
         console.error('[DOCUMENTS_POST] Dev text extraction failed:', extractError);
-        // Non-fatal — pipeline will show appropriate error
-        // Original file is kept for potential retry
+        // Mark as failed so the pipeline and UI know extraction didn't work
+        await DocumentModel.findByIdAndUpdate(doc._id, {
+          status: 'failed',
+          parsingErrors: [String(extractError)],
+        });
       }
     }
 

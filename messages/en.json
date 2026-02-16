@@ -256,6 +256,9 @@
     },
     "editor": {
       "title": "Review & Edit",
+      "pipelineNotReady": "The AI pipeline hasn't completed yet. Please run processing first.",
+      "viewProcessing": "View Processing Status",
+      "goToUpload": "Go to Upload",
       "field": "Field {number}",
       "accept": "Accept",
       "edit": "Edit",

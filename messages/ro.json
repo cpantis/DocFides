@@ -256,6 +256,9 @@
     },
     "editor": {
       "title": "Revizuiește și editează",
+      "pipelineNotReady": "Pipeline-ul AI nu s-a finalizat încă. Rulează mai întâi procesarea.",
+      "viewProcessing": "Vezi statusul procesării",
+      "goToUpload": "Mergi la încărcare",
       "field": "Câmp {number}",
       "accept": "Acceptă",
       "edit": "Editează",

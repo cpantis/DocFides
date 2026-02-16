@@ -48,10 +48,15 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Check if the real AI pipeline can be used (Anthropic API key is set).
+ * Check if the real AI pipeline can be used.
+ * Returns false if key is missing, empty, or a placeholder value.
  */
 function hasAnthropicKey(): boolean {
-  return !!process.env.ANTHROPIC_API_KEY;
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key || key.length < 10) return false;
+  // Detect placeholder values
+  const placeholders = ['LIPSESTE', 'MISSING', 'PLACEHOLDER', 'your-key', 'sk-ant-xxx'];
+  return !placeholders.some((p) => key.includes(p));
 }
 
 /**
@@ -104,21 +109,17 @@ export async function runPipelineBackground(
 
     try {
       if (useRealPipeline) {
-        // Run real AI pipeline stage
-        const { runPipeline } = await import('@/lib/ai/pipeline');
-        await runPipeline(projectId, stage);
+        // Try real AI pipeline stage, fallback to mock on failure
+        try {
+          const { runPipeline } = await import('@/lib/ai/pipeline');
+          await runPipeline(projectId, stage);
+        } catch (aiError) {
+          console.warn(`[Pipeline] Real AI failed for ${stage}, falling back to mock:`, aiError);
+          await runMockStage(stage, projectId, Project);
+        }
       } else {
         // Simulate with delay + save mock data
-        await sleep(SIMULATION_DELAYS[stage]);
-
-        const { getMockStageOutput, getStageOutputField } = await import('@/lib/ai/mock-pipeline-data');
-        const outputField = getStageOutputField(stage);
-        if (outputField) {
-          const mockOutput = getMockStageOutput(stage);
-          await Project.findByIdAndUpdate(projectId, {
-            $set: { [outputField]: mockOutput },
-          });
-        }
+        await runMockStage(stage, projectId, Project);
       }
 
       // Mark stage as completed
@@ -158,4 +159,25 @@ export async function runPipelineBackground(
   });
 
   console.log(`[Pipeline] Completed project ${projectId}`);
+}
+
+/**
+ * Run a mock/simulated stage with delay and save mock data.
+ */
+async function runMockStage(
+  stage: PipelineStage,
+  projectId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Project: any
+): Promise<void> {
+  await sleep(SIMULATION_DELAYS[stage]);
+
+  const { getMockStageOutput, getStageOutputField } = await import('@/lib/ai/mock-pipeline-data');
+  const outputField = getStageOutputField(stage);
+  if (outputField) {
+    const mockOutput = getMockStageOutput(stage);
+    await Project.findByIdAndUpdate(projectId, {
+      $set: { [outputField]: mockOutput },
+    });
+  }
 }

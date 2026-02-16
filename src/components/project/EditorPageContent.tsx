@@ -45,6 +45,25 @@ export function EditorPageContent({ projectId }: EditorPageContentProps) {
     );
   }
 
+  // Guard: redirect if pipeline hasn't completed
+  if (project.status !== 'ready' && project.status !== 'exported') {
+    const target = project.status === 'processing'
+      ? `/project/${projectId}/processing`
+      : `/project/${projectId}/upload`;
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 text-center">
+        <p className="text-gray-500">{t('pipelineNotReady')}</p>
+        <Link
+          href={target}
+          className="mt-4 inline-flex items-center gap-1.5 text-sm text-primary-600 hover:underline"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {project.status === 'processing' ? t('viewProcessing') : t('goToUpload')}
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen flex-col">
       {/* Header */}
