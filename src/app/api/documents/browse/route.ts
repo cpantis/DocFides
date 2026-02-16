@@ -34,23 +34,31 @@ export async function GET(req: NextRequest) {
   const dirPath = requestedPath || os.homedir();
 
   // Resolve to absolute (handles both Windows and Unix paths)
-  const resolved = path.resolve(dirPath);
+  let resolved = path.resolve(dirPath);
 
+  // Walk up to the nearest existing directory
+  let walked = false;
+  const root = path.parse(resolved).root;
+  while (resolved !== root) {
+    try {
+      const stat = await fs.stat(resolved);
+      if (stat.isDirectory()) break;
+      // It's a file, go to its parent
+      resolved = path.dirname(resolved);
+      walked = true;
+    } catch {
+      // Doesn't exist, go to parent
+      resolved = path.dirname(resolved);
+      walked = true;
+    }
+  }
+
+  // If we walked up but root doesn't exist either (e.g. Windows drive on Linux), fall back to cwd
   try {
     await fs.access(resolved);
   } catch {
-    return NextResponse.json(
-      { error: 'Directory not found', path: resolved },
-      { status: 404 }
-    );
-  }
-
-  const stat = await fs.stat(resolved);
-  if (!stat.isDirectory()) {
-    return NextResponse.json(
-      { error: 'Path is not a directory', path: resolved },
-      { status: 400 }
-    );
+    resolved = process.cwd();
+    walked = true;
   }
 
   try {
@@ -85,6 +93,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       data: {
         path: resolved,
+        requestedPath: walked ? dirPath : undefined,
         parent: path.dirname(resolved) !== resolved ? path.dirname(resolved) : null,
         separator: path.sep,
         folders,

@@ -251,6 +251,7 @@
         "goUp": "Go to parent folder",
         "goHome": "Go to home folder",
         "emptyFolder": "This folder is empty",
+        "pathNotFound": "\"{path}\" was not found — showing nearest existing folder",
         "cancel": "Cancel",
         "selectFolder": "Select This Folder"
       }

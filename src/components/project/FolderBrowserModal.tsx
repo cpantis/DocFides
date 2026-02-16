@@ -14,6 +14,7 @@ import {
 
 interface BrowseData {
   path: string;
+  requestedPath?: string;
   parent: string | null;
   separator: string;
   folders: { name: string; isDirectory: boolean }[];
@@ -165,6 +166,13 @@ export function FolderBrowserModal({ open, onClose, onSelect, initialPath }: Fol
               <div className="flex items-center gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-600">
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 {error}
+              </div>
+            )}
+
+            {!loading && !error && data?.requestedPath && (
+              <div className="mb-2 flex items-center gap-2 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700">
+                <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                {t('pathNotFound', { path: data.requestedPath })}
               </div>
             )}
 
