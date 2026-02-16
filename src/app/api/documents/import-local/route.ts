@@ -136,6 +136,22 @@ export async function POST(req: NextRequest) {
           await Project.findByIdAndUpdate(body.projectId, { $push: { modelDocuments: doc._id } });
         }
 
+        // Extract text and create Extraction record for the AI pipeline
+        try {
+          const { extractAndStoreText } = await import('@/lib/parsing/dev-extract');
+          await extractAndStoreText(
+            String(doc._id),
+            body.projectId,
+            r2Key,
+            filename,
+            mimeType,
+            sha256
+          );
+        } catch (extractError) {
+          console.error(`[IMPORT_LOCAL] Text extraction failed for ${filename}:`, extractError);
+          errors.push(`Warning: text extraction failed for ${role}/${filename}`);
+        }
+
         imported.push({ filename, role, size: buffer.length });
       }
     }

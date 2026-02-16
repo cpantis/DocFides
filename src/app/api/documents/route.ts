@@ -123,6 +123,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // In dev mode, extract text immediately so the AI pipeline can use it
+    if (!useR2) {
+      try {
+        const { extractAndStoreText } = await import('@/lib/parsing/dev-extract');
+        await extractAndStoreText(
+          String(doc._id),
+          projectId,
+          r2Key,
+          file.name,
+          file.type,
+          sha256
+        );
+      } catch (extractError) {
+        console.error('[DOCUMENTS_POST] Dev text extraction failed:', extractError);
+        // Non-fatal — pipeline will show appropriate error
+      }
+    }
+
     return NextResponse.json({ data: doc }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
