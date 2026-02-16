@@ -31,6 +31,7 @@ function nextFileId(): string {
 
 export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadComplete }: UploadZoneProps) {
   const t = useTranslations('project.upload');
+  const tc = useTranslations('common');
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -141,13 +142,13 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
       >
         <Upload className={cn('h-8 w-8', isDragging ? 'text-primary-500' : 'text-gray-400')} />
         <p className="mt-3 text-sm font-medium text-gray-600">
-          Drop files here or click to browse
+          {t('dropFiles')}
         </p>
         <p className="mt-1 text-xs text-gray-400">
           {t('acceptedFormats')}
         </p>
         <p className="mt-0.5 text-xs text-gray-400">
-          {t('maxSize', { max: String(MAX_SIZE_MB) })} &middot; {t('maxFiles', { max: String(remainingSlots) })} remaining
+          {t('maxSize', { max: String(MAX_SIZE_MB) })} &middot; {t('maxFiles', { max: String(remainingSlots) })} {t('remaining')}
         </p>
       </div>
 
@@ -191,7 +192,7 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
               disabled={isUploading}
               className="w-full rounded-xl bg-primary-600 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary-700 disabled:opacity-50"
             >
-              {isUploading ? 'Uploading...' : `Upload ${files.filter((f) => f.status === 'pending').length} file(s)`}
+              {isUploading ? tc('processing') : `${tc('upload')} ${files.filter((f) => f.status === 'pending').length}`}
             </button>
           )}
         </div>

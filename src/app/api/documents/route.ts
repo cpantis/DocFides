@@ -135,9 +135,19 @@ export async function POST(req: NextRequest) {
           file.type,
           sha256
         );
+
+        // Delete original file after successful extraction — only structured data is kept
+        try {
+          const { deleteFileLocal } = await import('@/lib/storage/dev-storage');
+          await deleteFileLocal(r2Key);
+          console.log('[DOCUMENTS_POST] Original file deleted after extraction:', r2Key);
+        } catch (cleanupError) {
+          console.error('[DOCUMENTS_POST] File cleanup failed (non-fatal):', cleanupError);
+        }
       } catch (extractError) {
         console.error('[DOCUMENTS_POST] Dev text extraction failed:', extractError);
         // Non-fatal — pipeline will show appropriate error
+        // Original file is kept for potential retry
       }
     }
 
