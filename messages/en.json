@@ -263,7 +263,15 @@
       "confidenceMedium": "Medium confidence — review recommended",
       "confidenceLow": "Low confidence — manual review required",
       "multipleSuggestions": "Multiple entities detected — please choose:",
-      "entitySource": "Source: {filename}"
+      "entitySource": "Source: {filename}",
+      "viewDocument": "Document",
+      "viewTemplate": "Template",
+      "templatePreviewSubtitle": "Template with {count} fields to fill",
+      "noFields": "No template fields detected",
+      "tableAddRow": "Add row",
+      "tableRemoveRow": "Remove row",
+      "tableAddColumn": "Add column",
+      "tableRemoveColumn": "Remove column"
     },
     "export": {
       "title": "Export Document",

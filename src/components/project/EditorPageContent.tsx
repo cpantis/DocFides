@@ -1,22 +1,28 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useProject } from '@/lib/hooks/use-projects';
 import { useEditorState } from '@/lib/hooks/use-editor-state';
 import { SplitScreen } from '@/components/editor/SplitScreen';
 import { DocumentPreview } from '@/components/editor/DocumentPreview';
+import { TemplatePreview } from '@/components/editor/TemplatePreview';
 import { SuggestionWizard } from '@/components/editor/SuggestionWizard';
-import { ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, FileText, LayoutTemplate, Save } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
 
 interface EditorPageContentProps {
   projectId: string;
 }
 
+type PreviewMode = 'document' | 'template';
+
 export function EditorPageContent({ projectId }: EditorPageContentProps) {
   const t = useTranslations('project.editor');
   const tc = useTranslations('common');
   const { project, isLoading } = useProject(projectId);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('document');
 
   const editor = useEditorState(projectId);
 
@@ -59,6 +65,34 @@ export function EditorPageContent({ projectId }: EditorPageContentProps) {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Preview mode toggle */}
+          <div className="hidden items-center rounded-lg border border-gray-200 p-0.5 sm:flex">
+            <button
+              onClick={() => setPreviewMode('document')}
+              className={cn(
+                'flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                previewMode === 'document'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'text-gray-500 hover:text-gray-700'
+              )}
+            >
+              <FileText className="h-3 w-3" />
+              {t('viewDocument')}
+            </button>
+            <button
+              onClick={() => setPreviewMode('template')}
+              className={cn(
+                'flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
+                previewMode === 'template'
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'text-gray-500 hover:text-gray-700'
+              )}
+            >
+              <LayoutTemplate className="h-3 w-3" />
+              {t('viewTemplate')}
+            </button>
+          </div>
+
           {/* Progress indicator */}
           <div className="hidden items-center gap-2 text-sm text-gray-500 sm:flex">
             <span className="font-mono text-xs">
@@ -71,6 +105,18 @@ export function EditorPageContent({ projectId }: EditorPageContentProps) {
               />
             </div>
           </div>
+
+          {/* Draft save indicator */}
+          {editor.isSavingDraft && (
+            <div className="flex items-center gap-1 text-xs text-gray-400">
+              <Save className="h-3 w-3 animate-pulse" />
+            </div>
+          )}
+          {editor.draftVersion > 0 && !editor.isSavingDraft && (
+            <span className="text-[10px] text-gray-300">
+              v{editor.draftVersion}
+            </span>
+          )}
 
           {/* Export button */}
           <Link
@@ -87,12 +133,21 @@ export function EditorPageContent({ projectId }: EditorPageContentProps) {
       <div className="flex-1 overflow-hidden">
         <SplitScreen
           left={
-            <DocumentPreview
-              projectName={project.name}
-              fields={editor.fields}
-              currentFieldIndex={editor.currentFieldIndex}
-              onFieldClick={editor.goToField}
-            />
+            previewMode === 'template' ? (
+              <TemplatePreview
+                projectName={project.name}
+                fields={editor.fields}
+                currentFieldIndex={editor.currentFieldIndex}
+                onFieldClick={editor.goToField}
+              />
+            ) : (
+              <DocumentPreview
+                projectName={project.name}
+                fields={editor.fields}
+                currentFieldIndex={editor.currentFieldIndex}
+                onFieldClick={editor.goToField}
+              />
+            )
           }
           right={
             <SuggestionWizard

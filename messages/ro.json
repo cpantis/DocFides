@@ -263,7 +263,15 @@
       "confidenceMedium": "Încredere medie — revizuire recomandată",
       "confidenceLow": "Încredere scăzută — revizuire manuală necesară",
       "multipleSuggestions": "Entități multiple detectate — alege:",
-      "entitySource": "Sursă: {filename}"
+      "entitySource": "Sursă: {filename}",
+      "viewDocument": "Document",
+      "viewTemplate": "Șablon",
+      "templatePreviewSubtitle": "Șablon cu {count} câmpuri de completat",
+      "noFields": "Nu s-au detectat câmpuri în șablon",
+      "tableAddRow": "Adaugă rând",
+      "tableRemoveRow": "Șterge rând",
+      "tableAddColumn": "Adaugă coloană",
+      "tableRemoveColumn": "Șterge coloană"
     },
     "export": {
       "title": "Exportă documentul",

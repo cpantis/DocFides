@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import useSWR from 'swr';
 
 export type FieldStatus = 'pending' | 'accepted' | 'modified' | 'skipped';
@@ -39,6 +39,8 @@ interface EditorState {
   undoStack: EditorSnapshot[];
   isSaving: boolean;
   isRegenerating: string | null;
+  draftVersion: number;
+  isSavingDraft: boolean;
 }
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -59,7 +61,12 @@ export function useEditorState(projectId: string) {
     undoStack: [],
     isSaving: false,
     isRegenerating: null,
+    draftVersion: 0,
+    isSavingDraft: false,
   });
+
+  // Debounce timer for auto-saving drafts
+  const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [initialized, setInitialized] = useState(false);
 
@@ -159,6 +166,84 @@ export function useEditorState(projectId: string) {
     });
   }, []);
 
+  // Helper: push snapshot + schedule draft auto-save
+  const pushSnapshotAndSchedule = useCallback(
+    (prev: EditorState, fieldId: string, updatedFields: EditorField[]): EditorState => {
+      const idx = prev.fields.findIndex((f) => f.id === fieldId);
+      if (idx === -1) return prev;
+
+      const field = prev.fields[idx]!;
+      const snapshot: EditorSnapshot = {
+        fieldId,
+        previousValue: field.currentValue,
+        previousStatus: field.status,
+        previousEntity: field.selectedEntity,
+      };
+
+      return {
+        ...prev,
+        fields: updatedFields,
+        undoStack: [...prev.undoStack, snapshot],
+      };
+    },
+    []
+  );
+
+  // Draft versioning — save snapshot to server
+  const saveDraft = useCallback(async () => {
+    setState((prev) => ({ ...prev, isSavingDraft: true }));
+    try {
+      const draftFields: Record<string, {
+        value: string;
+        status: 'ai_suggested' | 'accepted' | 'edited' | 'regenerated' | 'skipped';
+        previousValue?: string;
+        entityChoice?: string;
+      }> = {};
+
+      for (const field of state.fields) {
+        const statusMap: Record<FieldStatus, 'ai_suggested' | 'accepted' | 'edited' | 'regenerated' | 'skipped'> = {
+          pending: 'ai_suggested',
+          accepted: 'accepted',
+          modified: 'edited',
+          skipped: 'skipped',
+        };
+
+        draftFields[field.id] = {
+          value: field.currentValue,
+          status: statusMap[field.status],
+          previousValue: field.originalValue !== field.currentValue ? field.originalValue : undefined,
+          entityChoice: field.selectedEntity,
+        };
+      }
+
+      const res = await fetch(`/api/projects/${projectId}/draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: draftFields }),
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        setState((prev) => ({
+          ...prev,
+          draftVersion: result.data?.version ?? prev.draftVersion + 1,
+        }));
+      }
+    } finally {
+      setState((prev) => ({ ...prev, isSavingDraft: false }));
+    }
+  }, [projectId, state.fields]);
+
+  // Auto-save draft after each user action (debounced 5s)
+  const scheduleDraftSave = useCallback(() => {
+    if (draftTimerRef.current) {
+      clearTimeout(draftTimerRef.current);
+    }
+    draftTimerRef.current = setTimeout(() => {
+      saveDraft().catch(console.error);
+    }, 5000);
+  }, [saveDraft]);
+
   // Field actions
   const acceptField = useCallback((fieldId: string) => {
     setState((prev) => {
@@ -166,23 +251,13 @@ export function useEditorState(projectId: string) {
       if (idx === -1) return prev;
 
       const field = prev.fields[idx]!;
-      const snapshot: EditorSnapshot = {
-        fieldId,
-        previousValue: field.currentValue,
-        previousStatus: field.status,
-        previousEntity: field.selectedEntity,
-      };
-
       const updatedFields = [...prev.fields];
       updatedFields[idx] = { ...field, status: 'accepted' };
 
-      return {
-        ...prev,
-        fields: updatedFields,
-        undoStack: [...prev.undoStack, snapshot],
-      };
+      return pushSnapshotAndSchedule(prev, fieldId, updatedFields);
     });
-  }, []);
+    scheduleDraftSave();
+  }, [pushSnapshotAndSchedule, scheduleDraftSave]);
 
   const editField = useCallback((fieldId: string, newValue: string) => {
     setState((prev) => {
@@ -190,23 +265,13 @@ export function useEditorState(projectId: string) {
       if (idx === -1) return prev;
 
       const field = prev.fields[idx]!;
-      const snapshot: EditorSnapshot = {
-        fieldId,
-        previousValue: field.currentValue,
-        previousStatus: field.status,
-        previousEntity: field.selectedEntity,
-      };
-
       const updatedFields = [...prev.fields];
       updatedFields[idx] = { ...field, status: 'modified', currentValue: newValue };
 
-      return {
-        ...prev,
-        fields: updatedFields,
-        undoStack: [...prev.undoStack, snapshot],
-      };
+      return pushSnapshotAndSchedule(prev, fieldId, updatedFields);
     });
-  }, []);
+    scheduleDraftSave();
+  }, [pushSnapshotAndSchedule, scheduleDraftSave]);
 
   const skipField = useCallback((fieldId: string) => {
     setState((prev) => {
@@ -214,23 +279,13 @@ export function useEditorState(projectId: string) {
       if (idx === -1) return prev;
 
       const field = prev.fields[idx]!;
-      const snapshot: EditorSnapshot = {
-        fieldId,
-        previousValue: field.currentValue,
-        previousStatus: field.status,
-        previousEntity: field.selectedEntity,
-      };
-
       const updatedFields = [...prev.fields];
       updatedFields[idx] = { ...field, status: 'skipped' };
 
-      return {
-        ...prev,
-        fields: updatedFields,
-        undoStack: [...prev.undoStack, snapshot],
-      };
+      return pushSnapshotAndSchedule(prev, fieldId, updatedFields);
     });
-  }, []);
+    scheduleDraftSave();
+  }, [pushSnapshotAndSchedule, scheduleDraftSave]);
 
   const selectEntity = useCallback((fieldId: string, entity: string, value: string) => {
     setState((prev) => {
@@ -238,13 +293,6 @@ export function useEditorState(projectId: string) {
       if (idx === -1) return prev;
 
       const field = prev.fields[idx]!;
-      const snapshot: EditorSnapshot = {
-        fieldId,
-        previousValue: field.currentValue,
-        previousStatus: field.status,
-        previousEntity: field.selectedEntity,
-      };
-
       const updatedFields = [...prev.fields];
       updatedFields[idx] = {
         ...field,
@@ -275,13 +323,10 @@ export function useEditorState(projectId: string) {
         }
       }
 
-      return {
-        ...prev,
-        fields: updatedFields,
-        undoStack: [...prev.undoStack, snapshot],
-      };
+      return pushSnapshotAndSchedule(prev, fieldId, updatedFields);
     });
-  }, []);
+    scheduleDraftSave();
+  }, [pushSnapshotAndSchedule, scheduleDraftSave]);
 
   // Undo
   const undoField = useCallback((fieldId: string) => {
@@ -381,6 +426,33 @@ export function useEditorState(projectId: string) {
     }
   }, [projectId]);
 
+  // Load a specific draft version
+  const loadDraft = useCallback(async (version: number) => {
+    try {
+      const res = await fetch(`/api/projects/${projectId}/draft`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ version }),
+      });
+
+      if (res.ok) {
+        // Reload project data to get updated fieldCompletions
+        await mutateProject();
+        // Reset editor state so it re-initializes from fresh project data
+        setInitialized(false);
+        setState((prev) => ({
+          ...prev,
+          fields: [],
+          undoStack: [],
+          currentFieldIndex: 0,
+          draftVersion: version,
+        }));
+      }
+    } catch (error) {
+      console.error('[loadDraft] Failed:', error);
+    }
+  }, [projectId, mutateProject]);
+
   // Computed values
   const currentField = state.fields[state.currentFieldIndex];
 
@@ -399,6 +471,8 @@ export function useEditorState(projectId: string) {
     progress,
     isSaving: state.isSaving,
     isRegenerating: state.isRegenerating,
+    isSavingDraft: state.isSavingDraft,
+    draftVersion: state.draftVersion,
     hasUnsavedChanges,
     goToField,
     goToNextPending,
@@ -410,5 +484,7 @@ export function useEditorState(projectId: string) {
     undoAll,
     saveFields,
     regenerateField,
+    saveDraft,
+    loadDraft,
   };
 }
