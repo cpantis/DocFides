@@ -1,4 +1,11 @@
 import { PIPELINE_STAGES_ORDER, type PipelineStage } from '@/types/pipeline';
+import { runExtractorAgent } from './extractor-agent';
+import { runModelAgent } from './model-agent';
+import { runTemplateAgent } from './template-agent';
+import { runMappingAgent } from './mapping-agent';
+import { runWritingAgent } from './writing-agent';
+import { runVerificationAgent } from './verification-agent';
+import type { AgentResult } from './client';
 
 export interface PipelineContext {
   projectId: string;
@@ -51,7 +58,7 @@ export async function runPipeline(
     console.log(`[Pipeline] Running stage: ${stage}`);
 
     try {
-      const result = await runStage(stage, context, results);
+      const result = await runStage(stage, context);
       const stageResult: StageResult = {
         stage,
         output: result.output,
@@ -116,7 +123,7 @@ async function buildContextFromProject(projectId: string): Promise<PipelineConte
     modelMap: project.modelMap as Record<string, unknown> | undefined,
     templateSchema: project.templateSchema as Record<string, unknown> | undefined,
     draftPlan: project.draftPlan as Record<string, unknown> | undefined,
-    fieldCompletions: undefined,
+    fieldCompletions: project.fieldCompletions as Record<string, unknown> | undefined,
     qualityReport: project.qualityReport as Record<string, unknown> | undefined,
   };
 }
@@ -143,6 +150,9 @@ async function saveStageOutput(
     case 'mapping':
       update['draftPlan'] = output;
       break;
+    case 'writing':
+      update['fieldCompletions'] = output;
+      break;
     case 'verification':
       update['qualityReport'] = output;
       break;
@@ -153,16 +163,135 @@ async function saveStageOutput(
   }
 }
 
+/**
+ * Fetch raw text from Extraction collection for a set of documents.
+ * Combines rawText from each extraction, prefixed with filename.
+ */
+async function getDocumentTexts(
+  projectId: string,
+  role: 'source' | 'template' | 'model'
+): Promise<{ filename: string; content: string }[]> {
+  const { connectToDatabase, DocumentModel, Extraction } = await import('@/lib/db');
+  await connectToDatabase();
+
+  const docs = await DocumentModel.find({
+    projectId,
+    role,
+    status: 'extracted',
+  }).lean();
+
+  const results: { filename: string; content: string }[] = [];
+
+  for (const doc of docs) {
+    const extraction = await Extraction.findOne({
+      documentId: String(doc._id),
+    }).lean();
+
+    if (extraction?.rawText) {
+      results.push({
+        filename: doc.originalFilename,
+        content: extraction.rawText,
+      });
+    } else if (extraction?.blocks && extraction.blocks.length > 0) {
+      // Fallback: concatenate text from blocks
+      const text = extraction.blocks
+        .map((b) => (b as Record<string, unknown>).text ?? '')
+        .filter(Boolean)
+        .join('\n\n');
+      if (text) {
+        results.push({
+          filename: doc.originalFilename,
+          content: text,
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Run a single pipeline stage, routing to the appropriate agent.
+ */
 async function runStage(
   stage: PipelineStage,
-  _context: PipelineContext,
-  _previousResults: StageResult[]
-): Promise<{ output: Record<string, unknown>; tokenUsage: { inputTokens: number; outputTokens: number } }> {
-  // Agents are scaffolded in src/lib/ai/*-agent.ts
-  // Full AI implementation will come in Phase 5
-  console.log(`[Pipeline] Stage ${stage} — placeholder (AI implementation in Phase 5)`);
-  return {
-    output: { stage, status: 'placeholder', timestamp: new Date().toISOString() },
-    tokenUsage: { inputTokens: 0, outputTokens: 0 },
-  };
+  context: PipelineContext
+): Promise<AgentResult> {
+  switch (stage) {
+    case 'extractor': {
+      const sourceDocs = await getDocumentTexts(context.projectId, 'source');
+      if (sourceDocs.length === 0) {
+        throw new Error('No extracted source documents found for extractor stage');
+      }
+      return runExtractorAgent({
+        documents: sourceDocs.map((d) => ({
+          filename: d.filename,
+          content: d.content,
+          role: 'source' as const,
+        })),
+      });
+    }
+
+    case 'model': {
+      const modelDocs = await getDocumentTexts(context.projectId, 'model');
+      if (modelDocs.length === 0) {
+        throw new Error('No extracted model documents found for model stage');
+      }
+      return runModelAgent({ documents: modelDocs });
+    }
+
+    case 'template': {
+      const templateDocs = await getDocumentTexts(context.projectId, 'template');
+      const templateDoc = templateDocs[0];
+      if (!templateDoc) {
+        throw new Error('No extracted template document found for template stage');
+      }
+      return runTemplateAgent(templateDoc.content);
+    }
+
+    case 'mapping': {
+      if (!context.projectData) {
+        throw new Error('Missing projectData for mapping stage — run extractor first');
+      }
+      if (!context.templateSchema) {
+        throw new Error('Missing templateSchema for mapping stage — run template first');
+      }
+      return runMappingAgent({
+        projectData: context.projectData,
+        modelMap: context.modelMap,
+        templateSchema: context.templateSchema,
+      });
+    }
+
+    case 'writing': {
+      if (!context.projectData) {
+        throw new Error('Missing projectData for writing stage — run extractor first');
+      }
+      if (!context.draftPlan) {
+        throw new Error('Missing draftPlan for writing stage — run mapping first');
+      }
+      return runWritingAgent({
+        projectData: context.projectData,
+        modelMap: context.modelMap,
+        draftPlan: context.draftPlan,
+      });
+    }
+
+    case 'verification': {
+      if (!context.projectData) {
+        throw new Error('Missing projectData for verification stage — run extractor first');
+      }
+      if (!context.fieldCompletions) {
+        throw new Error('Missing fieldCompletions for verification stage — run writing first');
+      }
+      return runVerificationAgent({
+        projectData: context.projectData,
+        modelMap: context.modelMap,
+        fieldCompletions: context.fieldCompletions,
+      });
+    }
+
+    default:
+      throw new Error(`Unknown pipeline stage: ${stage}`);
+  }
 }

@@ -14,6 +14,7 @@ export interface IProject extends Document {
   modelMap?: Record<string, unknown>;
   templateSchema?: Record<string, unknown>;
   draftPlan?: Record<string, unknown>;
+  fieldCompletions?: Record<string, unknown>;
   qualityReport?: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
@@ -36,6 +37,7 @@ const ProjectSchema = new Schema<IProject>(
     modelMap: { type: Schema.Types.Mixed },
     templateSchema: { type: Schema.Types.Mixed },
     draftPlan: { type: Schema.Types.Mixed },
+    fieldCompletions: { type: Schema.Types.Mixed },
     qualityReport: { type: Schema.Types.Mixed },
   },
   { timestamps: true }
