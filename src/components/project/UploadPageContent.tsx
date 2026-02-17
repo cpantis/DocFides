@@ -9,7 +9,6 @@ import {
   ArrowRight,
   Info,
   Loader2,
-  Plus,
   Shield,
 } from 'lucide-react';
 import { ModelDocBadge } from './ModelDocBadge';
@@ -29,30 +28,6 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
   const refreshSources = () => {
     mutate();
     setSourceRefreshKey((k) => k + 1);
-  };
-
-  const openFilePicker = (role: string, maxFiles: number) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.multiple = maxFiles > 1;
-    input.accept = '.pdf,.docx,.doc,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.tiff,.tif';
-    input.onchange = async (e) => {
-      const files = (e.target as HTMLInputElement).files;
-      if (!files) return;
-      for (const file of Array.from(files)) {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('projectId', projectId);
-        formData.append('role', role);
-        try {
-          await fetch('/api/documents', { method: 'POST', body: formData });
-        } catch {
-          // Errors handled silently — user will see in document list
-        }
-      }
-      mutate();
-    };
-    input.click();
   };
 
   if (isLoading) {
@@ -126,16 +101,6 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
                 1 {t('uploaded')}
               </span>
             )}
-            {!hasTemplate && (
-              <button
-                type="button"
-                onClick={() => openFilePicker('template', 1)}
-                className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors hover:border-primary-400 hover:bg-primary-50 hover:text-primary-600"
-                title={t('dropFiles')}
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            )}
           </div>
           <p className="mt-1 text-sm text-gray-500">{t('templateHint')}</p>
           <div className="mt-4">
@@ -161,16 +126,6 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
                 {project.modelDocuments?.length} {t('uploaded')}
               </span>
             )}
-            {(project.modelDocuments?.length ?? 0) < 2 && (
-              <button
-                type="button"
-                onClick={() => openFilePicker('model', 2)}
-                className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors hover:border-primary-400 hover:bg-primary-50 hover:text-primary-600"
-                title={t('dropFiles')}
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            )}
           </div>
           <p className="mt-1 text-sm text-gray-500">{t('modelHint')}</p>
           <div className="mt-4">
@@ -194,16 +149,6 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
               <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
                 {sourceCount} {t('uploaded')}
               </span>
-            )}
-            {sourceCount < 10 && (
-              <button
-                type="button"
-                onClick={() => openFilePicker('source', 10)}
-                className="ml-auto flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-sm transition-colors hover:border-primary-400 hover:bg-primary-50 hover:text-primary-600"
-                title={t('dropFiles')}
-              >
-                <Plus className="h-4 w-4" />
-              </button>
             )}
           </div>
           <p className="mt-1 text-sm text-gray-500">{t('sourceHint')}</p>
