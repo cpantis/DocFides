@@ -38,8 +38,8 @@ dev-documents/model/*
 dev-documents/source/*
 !dev-documents/**/.gitkeep
 
-# vercel
-.vercel
+# docker
+docker-compose.override.yml
 
 # typescript
 *.tsbuildinfo
