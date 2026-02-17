@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useCallback, useRef, useState } from 'react';
-import { Upload, X, FileText, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, X, FileText, AlertCircle, Loader2, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import type { DocumentRole } from '@/lib/db/models/document';
 
@@ -21,7 +21,7 @@ interface UploadedFile {
   error?: string;
 }
 
-const ACCEPTED_EXTENSIONS = '.pdf,.docx,.xlsx,.xls,.png,.jpg,.jpeg,.tiff,.tif';
+const ACCEPTED_EXTENSIONS = '.pdf,.docx,.doc,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.tiff,.tif';
 const MAX_SIZE_MB = 25;
 
 let fileCounter = 0;
@@ -122,29 +122,31 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
 
   const hasPending = files.some((f) => f.status === 'pending');
 
+  const openFilePicker = useCallback(() => {
+    if (isUploading) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = maxFiles > 1;
+    input.accept = ACCEPTED_EXTENSIONS;
+    input.onchange = (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files) handleFiles(target.files);
+    };
+    input.click();
+  }, [isUploading, maxFiles, handleFiles]);
+
   return (
     <div className="space-y-4">
-      {/* Drop zone */}
+      {/* Drop zone + add button */}
       <div
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
         className={cn(
-          'flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 transition-colors',
+          'relative flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 transition-colors',
           isDragging ? 'border-primary-400 bg-primary-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
         )}
-        onClick={() => {
-          if (isUploading) return;
-          const input = document.createElement('input');
-          input.type = 'file';
-          input.multiple = maxFiles > 1;
-          input.accept = ACCEPTED_EXTENSIONS;
-          input.onchange = (e) => {
-            const target = e.target as HTMLInputElement;
-            if (target.files) handleFiles(target.files);
-          };
-          input.click();
-        }}
+        onClick={openFilePicker}
       >
         <Upload className={cn('h-8 w-8', isDragging ? 'text-primary-500' : 'text-gray-400')} />
         <p className="mt-3 text-sm font-medium text-gray-600">
@@ -156,6 +158,21 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
         <p className="mt-0.5 text-xs text-gray-400">
           {t('maxSize', { max: String(MAX_SIZE_MB) })} &middot; {t('maxFiles', { max: String(remainingSlots) })} {t('remaining')}
         </p>
+
+        {/* "+" button — alternative to drag & drop */}
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); openFilePicker(); }}
+          disabled={isUploading || remainingSlots <= 0}
+          className={cn(
+            'absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-lg border-2 transition-colors',
+            'border-gray-300 bg-white text-gray-500 shadow-sm hover:border-primary-400 hover:bg-primary-50 hover:text-primary-600',
+            'disabled:cursor-not-allowed disabled:opacity-40'
+          )}
+          title={t('dropFiles')}
+        >
+          <Plus className="h-5 w-5" />
+        </button>
       </div>
 
       {/* File list */}

@@ -33,6 +33,7 @@ export type BlockSource =
   | 'openpyxl'
   | 'pdf-parse'
   | 'mammoth'
+  | 'word-extractor'
   | 'xlsx'
   | 'sharp-tesseract';
 

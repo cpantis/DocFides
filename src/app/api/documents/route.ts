@@ -2,10 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
 import { connectToDatabase, DocumentModel, Project } from '@/lib/db';
-import { uploadDocumentSchema, validateFileSize, validateMimeType, MAX_SOURCE_FILES, MAX_MODEL_FILES } from '@/lib/utils/validation';
+import {
+  uploadDocumentSchema,
+  validateFileSize,
+  validateMimeType,
+  resolveMimeType,
+  MAX_SOURCE_FILES,
+  MAX_MODEL_FILES,
+} from '@/lib/utils/validation';
 import { hashFile } from '@/lib/utils/hash';
-import { generateR2Key } from '@/lib/storage/upload';
-import { isR2Configured, uploadFileLocal } from '@/lib/storage/dev-storage';
+import { saveTempFile, deleteTempFile, generateStorageKey } from '@/lib/storage/tmp-storage';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,7 +29,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    if (!validateMimeType(file.type)) {
+    // Resolve MIME type from both declared type and extension (browsers may send generic types)
+    const mimeType = resolveMimeType(file.type, file.name);
+
+    if (!validateMimeType(mimeType)) {
       return NextResponse.json({ error: 'Unsupported file format' }, { status: 400 });
     }
 
@@ -58,21 +67,13 @@ export async function POST(req: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const sha256 = await hashFile(buffer);
-    const r2Key = generateR2Key(userId, projectId, file.name);
+    const storageKey = generateStorageKey(userId, projectId, file.name);
 
-    // Upload to R2 or local filesystem
-    const useR2 = isR2Configured();
-    if (useR2) {
-      const { uploadFile } = await import('@/lib/storage/upload');
-      await uploadFile(r2Key, buffer, file.type);
-    } else {
-      console.log('[DOCUMENTS_POST] R2 not configured, using local storage');
-      await uploadFileLocal(r2Key, buffer, file.type);
-    }
+    // Save to /tmp for pipeline parser stage (may re-read if re-parsing needed)
+    await saveTempFile(storageKey, buffer);
 
     const format = file.name.split('.').pop()?.toLowerCase() ?? 'unknown';
 
-    // Always start as 'uploaded' — only mark 'extracted' after successful extraction
     const doc = await DocumentModel.create({
       projectId,
       userId,
@@ -81,8 +82,8 @@ export async function POST(req: NextRequest) {
       format,
       sizeBytes: file.size,
       sha256,
-      r2Key,
-      mimeType: file.type,
+      r2Key: storageKey,
+      mimeType,
       status: 'uploaded',
       deleteAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
     });
@@ -96,65 +97,32 @@ export async function POST(req: NextRequest) {
       await Project.findByIdAndUpdate(projectId, { $push: { modelDocuments: doc._id } });
     }
 
-    // Queue OCR/parsing job only when R2 + Redis are configured
-    if (useR2 && (role === 'source' || role === 'template')) {
-      try {
-        const { getOcrQueue } = await import('@/lib/queue/queues');
-        const ocrQueue = getOcrQueue();
-        await ocrQueue.add(
-          `ocr-${doc._id}`,
-          {
-            documentId: String(doc._id),
-            projectId,
-            r2Key,
-            filename: file.name,
-            mimeType: file.type,
-            sha256,
-          },
-          {
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 5000 },
-          }
-        );
-      } catch (queueError) {
-        console.error('[DOCUMENTS_POST] Failed to queue OCR job:', queueError);
-      }
+    // Extract text immediately from the in-memory buffer (no re-read from disk)
+    try {
+      const { parseAndStore } = await import('@/lib/parsing/parse-pipeline');
+      await parseAndStore(
+        String(doc._id),
+        projectId,
+        buffer,
+        file.name,
+        mimeType,
+        sha256
+      );
+
+      await DocumentModel.findByIdAndUpdate(doc._id, { status: 'extracted' });
+
+      // Cleanup temp file — extraction data is now in MongoDB
+      await deleteTempFile(storageKey);
+    } catch (extractError) {
+      console.error('[DOCUMENTS_POST] Text extraction failed:', extractError);
+      await DocumentModel.findByIdAndUpdate(doc._id, {
+        status: 'failed',
+        parsingErrors: [String(extractError)],
+      });
+      // Keep temp file so pipeline parser stage can retry
     }
 
-    // In dev mode, extract text immediately so the AI pipeline can use it
-    if (!useR2) {
-      try {
-        const { extractAndStoreText } = await import('@/lib/parsing/dev-extract');
-        await extractAndStoreText(
-          String(doc._id),
-          projectId,
-          r2Key,
-          file.name,
-          file.type,
-          sha256
-        );
-
-        // Mark as extracted only after successful extraction
-        await DocumentModel.findByIdAndUpdate(doc._id, { status: 'extracted' });
-
-        // Delete original file — only structured data is kept
-        try {
-          const { deleteFileLocal } = await import('@/lib/storage/dev-storage');
-          await deleteFileLocal(r2Key);
-        } catch (cleanupError) {
-          console.error('[DOCUMENTS_POST] File cleanup failed (non-fatal):', cleanupError);
-        }
-      } catch (extractError) {
-        console.error('[DOCUMENTS_POST] Dev text extraction failed:', extractError);
-        // Mark as failed so the pipeline and UI know extraction didn't work
-        await DocumentModel.findByIdAndUpdate(doc._id, {
-          status: 'failed',
-          parsingErrors: [String(extractError)],
-        });
-      }
-    }
-
-    // Re-fetch to return the actual current status (may have changed to 'extracted' or 'failed')
+    // Re-fetch to return actual current status
     const updatedDoc = await DocumentModel.findById(doc._id).lean();
     return NextResponse.json({ data: updatedDoc ?? doc }, { status: 201 });
   } catch (error) {

@@ -237,7 +237,7 @@
       "startProcessing": "Începe procesarea",
       "maxFiles": "Maximum {max} fișiere",
       "maxSize": "Maximum {max}MB per fișier",
-      "acceptedFormats": "Acceptate: PDF, DOCX, XLSX, XLS, PNG, JPG, TIFF",
+      "acceptedFormats": "Acceptate: PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, PNG, TIFF",
       "dropFiles": "Trage fișierele aici sau click pentru a selecta",
       "remaining": "rămase"
     },

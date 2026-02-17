@@ -219,6 +219,14 @@ export async function runPipelineBackground(
   // Mark project as ready
   await Project.findByIdAndUpdate(projectId, { $set: { status: 'ready' } });
 
+  // Cleanup /tmp files for this project (all extraction data is now in MongoDB)
+  try {
+    const { cleanupProjectFiles } = await import('@/lib/storage/tmp-storage');
+    await cleanupProjectFiles(userId, projectId);
+  } catch (cleanupErr) {
+    console.warn('[Pipeline] Temp file cleanup failed (non-fatal):', cleanupErr);
+  }
+
   await Audit.create({
     userId,
     projectId,

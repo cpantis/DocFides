@@ -17,6 +17,7 @@ import type { MergedExtraction } from './merger';
 export type DocumentCategory =
   | 'pdf'
   | 'docx'
+  | 'doc'
   | 'xlsx'
   | 'image'
   | 'text'
@@ -42,6 +43,11 @@ export function detectDocumentCategory(
     ext === '.docx'
   ) {
     return 'docx';
+  }
+
+  // DOC (Word 97-2003)
+  if (mimeType === 'application/msword' || ext === '.doc') {
+    return 'doc';
   }
 
   // XLSX / XLS
@@ -94,6 +100,11 @@ export async function parseDocument(
     case 'docx': {
       const { extractFromDocx } = await import('./docx-extractor');
       return extractFromDocx(buffer, filename);
+    }
+
+    case 'doc': {
+      const { extractFromDoc } = await import('./doc-extractor');
+      return extractFromDoc(buffer, filename);
     }
 
     case 'xlsx': {

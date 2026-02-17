@@ -288,16 +288,21 @@ async function runParserStage(projectId: string): Promise<AgentResult> {
         continue;
       }
 
-      // Download file
+      // Download file from /tmp storage (fallback to legacy paths)
       await DocumentModel.findByIdAndUpdate(docId, { status: 'processing' });
       let fileBuffer: Buffer;
       try {
-        const { downloadFile } = await import('@/lib/storage/download');
-        fileBuffer = await downloadFile(doc.r2Key);
+        const { readTempFile } = await import('@/lib/storage/tmp-storage');
+        fileBuffer = await readTempFile(doc.r2Key);
       } catch {
-        // Try local dev storage
-        const { downloadFileLocal } = await import('@/lib/storage/dev-storage');
-        fileBuffer = await downloadFileLocal(doc.r2Key);
+        // Fallback: try legacy local dev storage or R2
+        try {
+          const { downloadFileLocal } = await import('@/lib/storage/dev-storage');
+          fileBuffer = await downloadFileLocal(doc.r2Key);
+        } catch {
+          const { downloadFile } = await import('@/lib/storage/download');
+          fileBuffer = await downloadFile(doc.r2Key);
+        }
       }
 
       // Parse using the intelligent pipeline (AI Vision → Python → Node.js)

@@ -237,7 +237,7 @@
       "startProcessing": "Start Processing",
       "maxFiles": "Maximum {max} files",
       "maxSize": "Maximum {max}MB per file",
-      "acceptedFormats": "Accepted: PDF, DOCX, XLSX, XLS, PNG, JPG, TIFF",
+      "acceptedFormats": "Accepted: PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, PNG, TIFF",
       "dropFiles": "Drop files here or click to browse",
       "remaining": "remaining"
     },

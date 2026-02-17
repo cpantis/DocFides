@@ -1,30 +1,27 @@
 /**
- * Document extraction entry point for dev mode (local file storage).
+ * Document extraction entry point — reads from /tmp storage.
  *
  * Delegates to the full parsing pipeline (parse-pipeline.ts) which uses:
+ * - Claude AI Vision (primary)
  * - pdf-parse for native PDFs
  * - Sharp + Tesseract.js for scanned PDFs and images
- * - mammoth for DOCX
+ * - mammoth for DOCX, word-extractor for DOC
  * - SheetJS for XLSX/XLS
  *
  * Creates Extraction records in MongoDB so the AI pipeline can find document texts.
  */
 
-import { promises as fs } from 'fs';
-import path from 'path';
-
-const UPLOADS_DIR = path.join(process.cwd(), '.uploads');
+import { readTempFile } from '@/lib/storage/tmp-storage';
 
 /**
- * Extract text from a file stored in local uploads and create an Extraction record.
- * Uses the full parsing pipeline with OCR, table extraction, and confidence scoring.
+ * Extract text from a file stored in /tmp and create an Extraction record.
  *
  * @returns The raw text extracted (empty string if format is unsupported).
  */
 export async function extractAndStoreText(
   documentId: string,
   projectId: string,
-  r2Key: string,
+  storageKey: string,
   originalFilename: string,
   mimeType: string,
   sha256: string
@@ -38,10 +35,8 @@ export async function extractAndStoreText(
     return existing.rawText ?? '';
   }
 
-  const filePath = path.join(UPLOADS_DIR, r2Key);
-  const buffer = await fs.readFile(filePath);
+  const buffer = await readTempFile(storageKey);
 
-  // Use the full parsing pipeline
   const { parseAndStore } = await import('./parse-pipeline');
   const merged = await parseAndStore(
     documentId,
