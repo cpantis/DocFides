@@ -16,12 +16,13 @@ import { saveTempFile, generateStorageKey } from '@/lib/storage/tmp-storage';
 
 interface UploadResult {
   success: boolean;
-  data?: Record<string, unknown>;
+  documentId?: string;
   error?: string;
 }
 
 export async function uploadDocument(formData: FormData): Promise<UploadResult> {
   try {
+    console.log('[UPLOAD] Step 1: auth');
     const { userId } = await auth();
     if (!userId) return { success: false, error: 'Unauthorized' };
 
@@ -30,6 +31,7 @@ export async function uploadDocument(formData: FormData): Promise<UploadResult> 
     const role = formData.get('role') as string;
     const tagId = formData.get('tagId') as string | null;
 
+    console.log('[UPLOAD] Step 2: validate schema', { projectId, role, fileName: file?.name, fileSize: file?.size });
     uploadDocumentSchema.parse({ projectId, role });
 
     if (!file) {
@@ -47,6 +49,7 @@ export async function uploadDocument(formData: FormData): Promise<UploadResult> 
       return { success: false, error: 'File too large (max 25MB)' };
     }
 
+    console.log('[UPLOAD] Step 3: connect to DB');
     await connectToDatabase();
 
     const project = await Project.findOne({ _id: projectId, userId });
@@ -55,6 +58,7 @@ export async function uploadDocument(formData: FormData): Promise<UploadResult> 
     }
 
     // Check file limits
+    console.log('[UPLOAD] Step 4: check file limits');
     if (role === 'source') {
       const sourceCount = await DocumentModel.countDocuments({ projectId, role: 'source', status: { $ne: 'deleted' } });
       if (sourceCount >= MAX_SOURCE_FILES) {
@@ -72,15 +76,17 @@ export async function uploadDocument(formData: FormData): Promise<UploadResult> 
       }
     }
 
+    console.log('[UPLOAD] Step 5: read file buffer');
     const buffer = Buffer.from(await file.arrayBuffer());
     const sha256 = await hashFile(buffer);
     const storageKey = generateStorageKey(userId, projectId, file.name);
 
-    // Save to /tmp for pipeline parser stage (may re-read if re-parsing needed)
+    console.log('[UPLOAD] Step 6: save to /tmp');
     await saveTempFile(storageKey, buffer);
 
     const format = file.name.split('.').pop()?.toLowerCase() ?? 'unknown';
 
+    console.log('[UPLOAD] Step 7: create document in DB');
     const doc = await DocumentModel.create({
       projectId,
       userId,
@@ -97,6 +103,7 @@ export async function uploadDocument(formData: FormData): Promise<UploadResult> 
     });
 
     // Update project document references
+    console.log('[UPLOAD] Step 8: update project refs');
     if (role === 'source') {
       await Project.findByIdAndUpdate(projectId, { $push: { sourceDocuments: doc._id } });
     } else if (role === 'template') {
@@ -105,12 +112,14 @@ export async function uploadDocument(formData: FormData): Promise<UploadResult> 
       await Project.findByIdAndUpdate(projectId, { $push: { modelDocuments: doc._id } });
     }
 
-    return { success: true, data: JSON.parse(JSON.stringify(doc)) };
+    console.log('[UPLOAD] Step 9: done, returning documentId:', doc._id.toString());
+    return { success: true, documentId: doc._id.toString() };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { success: false, error: error.errors.map((e) => e.message).join(', ') };
     }
-    console.error('[UPLOAD_DOCUMENT]', error);
-    return { success: false, error: 'Internal server error' };
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error('[UPLOAD_DOCUMENT] Failed:', msg, error);
+    return { success: false, error: msg || 'Internal server error' };
   }
 }

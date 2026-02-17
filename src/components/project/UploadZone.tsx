@@ -179,7 +179,11 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
             prev.map((f) => f.id === item.id ? { ...f, status: 'success' as const } : f)
           );
         } catch (err) {
-          const message = err instanceof Error ? err.message : t('errors.fileReadError');
+          // Server Actions throw generic errors when the response is malformed (e.g. body size exceeded)
+          const raw = err instanceof Error ? err.message : String(err);
+          const message = raw.includes('unexpected response')
+            ? 'File too large or server error — check terminal for details'
+            : raw || t('errors.fileReadError');
           setFiles((prev) =>
             prev.map((f) => f.id === item.id ? { ...f, status: 'error' as const, error: message } : f)
           );
