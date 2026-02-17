@@ -207,6 +207,17 @@
       "costPerDoc": "Avg. cost/document",
       "timeSaved": "Hours saved",
       "recentActivity": "Recent Activity"
+    },
+    "tags": {
+      "title": "Document Tags",
+      "description": "Manage tags to categorize your source documents by entity role. Tags help the AI pipeline associate data with the correct entities.",
+      "addTag": "Add Tag",
+      "noTags": "No tags yet. Add your first tag to categorize documents.",
+      "namePlaceholder": "Tag name...",
+      "manageTags": "Manage Tags",
+      "selectTag": "Select tag",
+      "removeTag": "Remove tag",
+      "addLabel": "+ Tag"
     }
   },
   "project": {

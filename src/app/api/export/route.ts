@@ -7,8 +7,7 @@ import { convertDocxToPdf } from '@/lib/docgen/pdf-converter';
 import { validateExportedDocx } from '@/lib/docgen/export-validator';
 import { extractTextFromDocxBuffer } from '@/lib/docgen/docx-text-extractor';
 import { runExportAgent } from '@/lib/ai/export-agent';
-import { downloadFile } from '@/lib/storage/download';
-import { uploadFile, generateR2Key } from '@/lib/storage/upload';
+import { readTempFile, saveTempFile, generateStorageKey } from '@/lib/storage/tmp-storage';
 import { analyzePdfTemplate } from '@/lib/docgen/pdf-template-detector';
 import { fillPdfForm, fillFlatPdf, type PdfFieldPlacement } from '@/lib/docgen/pdf-form-filler';
 
@@ -36,7 +35,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Project not ready for export' }, { status: 400 });
     }
 
-    // Fetch template document from R2
+    // Fetch template document from /tmp storage
     const templateDoc = await DocumentModel.findOne({
       _id: project.templateDocument,
       role: 'template',
@@ -47,7 +46,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Template document not found' }, { status: 404 });
     }
 
-    const templateBuffer = await downloadFile(templateDoc.r2Key);
+    const templateBuffer = await readTempFile(templateDoc.storageKey);
 
     // Build generation input from pipeline outputs
     const fieldCompletions = (project.fieldCompletions ?? {}) as Record<string, unknown>;
@@ -149,13 +148,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Build filenames — ASCII-safe for R2 key, UTF-8 for download
+    // Build filenames — ASCII-safe for storage key, UTF-8 for download
     const safeFilename = `${project.name.replace(/[^a-zA-Z0-9._-]/g, '_')}.${fileExtension}`;
     const displayFilename = `${project.name}.${fileExtension}`;
 
-    // Upload generated document to R2
-    const r2Key = generateR2Key(userId, body.projectId, safeFilename);
-    await uploadFile(r2Key, outputBuffer, contentType);
+    // Save generated document to /tmp storage
+    const exportStorageKey = generateStorageKey(userId, body.projectId, safeFilename);
+    await saveTempFile(exportStorageKey, outputBuffer);
 
     // Record generation in DB
     await Generation.create({
@@ -163,7 +162,7 @@ export async function POST(req: NextRequest) {
       userId,
       type: body.format,
       creditsUsed: 0,
-      r2Key,
+      storageKey: exportStorageKey,
     });
 
     await Audit.create({
@@ -172,7 +171,7 @@ export async function POST(req: NextRequest) {
       action: 'export_generated',
       details: {
         format: body.format,
-        r2Key,
+        storageKey: exportStorageKey,
         sizeBytes: outputBuffer.length,
         templateType: isPdfTemplate ? 'pdf' : 'docx',
       },

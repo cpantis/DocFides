@@ -173,8 +173,8 @@ async function saveStageOutput(
 async function getDocumentTexts(
   projectId: string,
   role: 'source' | 'template' | 'model'
-): Promise<{ filename: string; content: string }[]> {
-  const { connectToDatabase, DocumentModel, Extraction } = await import('@/lib/db');
+): Promise<{ filename: string; content: string; tagId?: string; tagName?: string }[]> {
+  const { connectToDatabase, DocumentModel, Extraction, Tag } = await import('@/lib/db');
   await connectToDatabase();
 
   const docs = await DocumentModel.find({
@@ -183,17 +183,32 @@ async function getDocumentTexts(
     status: 'extracted',
   }).lean();
 
-  const results: { filename: string; content: string }[] = [];
+  // Resolve tag names for documents that have tags
+  const tagIds = [...new Set(docs.map((d) => d.tagId).filter(Boolean))] as string[];
+  const tagMap = new Map<string, string>();
+  if (tagIds.length > 0) {
+    const tags = await Tag.find({ _id: { $in: tagIds } }).lean();
+    for (const tag of tags) {
+      tagMap.set(String(tag._id), tag.name);
+    }
+  }
+
+  const results: { filename: string; content: string; tagId?: string; tagName?: string }[] = [];
 
   for (const doc of docs) {
     const extraction = await Extraction.findOne({
       documentId: String(doc._id),
     }).lean();
 
+    const tagId = doc.tagId as string | undefined;
+    const tagName = tagId ? tagMap.get(tagId) : undefined;
+
     if (extraction?.rawText) {
       results.push({
         filename: doc.originalFilename,
         content: extraction.rawText,
+        tagId,
+        tagName,
       });
     } else if (extraction?.blocks && extraction.blocks.length > 0) {
       // Fallback: concatenate text from blocks
@@ -205,6 +220,8 @@ async function getDocumentTexts(
         results.push({
           filename: doc.originalFilename,
           content: text,
+          tagId,
+          tagName,
         });
       }
     }
@@ -288,22 +305,10 @@ async function runParserStage(projectId: string): Promise<AgentResult> {
         continue;
       }
 
-      // Download file from /tmp storage (fallback to legacy paths)
+      // Download file from /tmp storage
       await DocumentModel.findByIdAndUpdate(docId, { status: 'processing' });
-      let fileBuffer: Buffer;
-      try {
-        const { readTempFile } = await import('@/lib/storage/tmp-storage');
-        fileBuffer = await readTempFile(doc.r2Key);
-      } catch {
-        // Fallback: try legacy local dev storage or R2
-        try {
-          const { downloadFileLocal } = await import('@/lib/storage/dev-storage');
-          fileBuffer = await downloadFileLocal(doc.r2Key);
-        } catch {
-          const { downloadFile } = await import('@/lib/storage/download');
-          fileBuffer = await downloadFile(doc.r2Key);
-        }
-      }
+      const { readTempFile } = await import('@/lib/storage/tmp-storage');
+      const fileBuffer = await readTempFile(doc.storageKey);
 
       // Parse using the intelligent pipeline (AI Vision → Python → Node.js)
       const { parseDocument } = await import('@/lib/parsing/parse-pipeline');
@@ -417,6 +422,7 @@ async function runStage(
           filename: d.filename,
           content: d.content,
           role: 'source' as const,
+          tag: d.tagName,
         })),
       });
     }
@@ -451,14 +457,8 @@ async function runStage(
         // Analyze PDF template: detect AcroForm fields, determine type
         const { analyzePdfTemplate } = await import('@/lib/docgen/pdf-template-detector');
 
-        let templateBuffer: Buffer;
-        try {
-          const { downloadFile } = await import('@/lib/storage/download');
-          templateBuffer = await downloadFile(templateDocRecord.r2Key);
-        } catch {
-          const { downloadFileLocal } = await import('@/lib/storage/dev-storage');
-          templateBuffer = await downloadFileLocal(templateDocRecord.r2Key);
-        }
+        const { readTempFile: readTmp } = await import('@/lib/storage/tmp-storage');
+        const templateBuffer = await readTmp(templateDocRecord.storageKey);
 
         const pdfAnalysis = await analyzePdfTemplate(templateBuffer);
 
@@ -495,10 +495,17 @@ async function runStage(
       if (!context.templateSchema) {
         throw new Error('Missing templateSchema for mapping stage — run template first');
       }
+      // Fetch tag assignments for source documents to pass to mapping agent
+      const sourceDocsForMapping = await getDocumentTexts(context.projectId, 'source');
+      const documentTags = sourceDocsForMapping
+        .filter((d) => d.tagName)
+        .map((d) => ({ filename: d.filename, tag: d.tagName! }));
+
       return runMappingAgent({
         projectData: context.projectData,
         modelMap: context.modelMap,
         templateSchema: context.templateSchema,
+        documentTags: documentTags.length > 0 ? documentTags : undefined,
       });
     }
 

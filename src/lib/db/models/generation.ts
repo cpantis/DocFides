@@ -10,7 +10,7 @@ export interface IGeneration extends Document {
     inputTokens: number;
     outputTokens: number;
   };
-  r2Key?: string;
+  storageKey?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -26,7 +26,7 @@ const GenerationSchema = new Schema<IGeneration>(
       inputTokens: { type: Number },
       outputTokens: { type: Number },
     },
-    r2Key: { type: String },
+    storageKey: { type: String },
   },
   { timestamps: true }
 );

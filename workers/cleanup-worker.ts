@@ -17,7 +17,7 @@ export const cleanupWorker = new Worker<CleanupJobData>(
     console.log(`[Cleanup] Running ${type} cleanup`);
 
     const { connectToDatabase, DocumentModel, Audit } = await import('../src/lib/db');
-    const { deleteFile } = await import('../src/lib/storage/cleanup');
+    const { deleteTempFile } = await import('../src/lib/storage/tmp-storage');
 
     await connectToDatabase();
 
@@ -33,7 +33,7 @@ export const cleanupWorker = new Worker<CleanupJobData>(
       let cleaned = 0;
       for (const doc of expiredDocs) {
         try {
-          await deleteFile(doc.r2Key);
+          await deleteTempFile(doc.storageKey);
           doc.status = 'deleted';
           await doc.save();
           cleaned++;
@@ -49,7 +49,7 @@ export const cleanupWorker = new Worker<CleanupJobData>(
             },
           });
         } catch (error) {
-          console.error(`[Cleanup] Failed to delete ${doc.r2Key}:`, error);
+          console.error(`[Cleanup] Failed to delete ${doc.storageKey}:`, error);
         }
       }
 
@@ -72,12 +72,12 @@ export const cleanupWorker = new Worker<CleanupJobData>(
       let cleaned = 0;
       for (const doc of docs) {
         try {
-          await deleteFile(doc.r2Key);
+          await deleteTempFile(doc.storageKey);
           doc.status = 'deleted';
           await doc.save();
           cleaned++;
         } catch (error) {
-          console.error(`[Cleanup] Failed to delete ${doc.r2Key}:`, error);
+          console.error(`[Cleanup] Failed to delete ${doc.storageKey}:`, error);
         }
       }
 

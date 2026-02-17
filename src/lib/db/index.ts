@@ -6,3 +6,4 @@ export { Extraction } from './models/extraction';
 export { Draft } from './models/draft';
 export { Generation } from './models/generation';
 export { Audit } from './models/audit';
+export { Tag } from './models/tag';

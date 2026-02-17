@@ -8,7 +8,7 @@ import { redisConnection } from './connection';
 export interface OcrJobData {
   documentId: string;
   projectId: string;
-  r2Key: string;
+  storageKey: string;
   filename: string;
   mimeType: string;
   sha256: string;

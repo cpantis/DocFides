@@ -1,6 +1,6 @@
 /**
  * Temporary file storage using /tmp with automatic cleanup.
- * Zero external dependencies — no R2, no persistent disk.
+ * Zero external dependencies — no cloud storage, no persistent disk.
  *
  * Files are stored in /tmp/docfides/{projectId}/ and cleaned up
  * after extraction or when the project pipeline completes.

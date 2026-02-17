@@ -7,12 +7,16 @@ export interface ExtractorInput {
     filename: string;
     content: string;
     role: 'source';
+    tag?: string;
   }[];
 }
 
 export async function runExtractorAgent(input: ExtractorInput): Promise<AgentResult> {
   const documentsText = input.documents
-    .map((d) => `--- Document: ${d.filename} ---\n${d.content}`)
+    .map((d) => {
+      const tagLine = d.tag ? ` [Tag: ${d.tag}]` : '';
+      return `--- Document: ${d.filename}${tagLine} ---\n${d.content}`;
+    })
     .join('\n\n');
 
   return callAgentWithRetry(
@@ -59,7 +63,7 @@ export async function runExtractorAgent(input: ExtractorInput): Promise<AgentRes
       messages: [
         {
           role: 'user',
-          content: `Extract all factual data from the following source documents. Organize by entity (beneficiary, contractor, subcontractors). Use filename hints to assign entity roles. Validate CUI checksums, IBAN format, dates, and financial totals.\n\n${documentsText}`,
+          content: `Extract all factual data from the following source documents. Organize by entity (beneficiary, contractor, subcontractors). Use filename hints AND document tags (shown as [Tag: ...]) to assign entity roles. A tag like "Beneficiar" means the document belongs to the beneficiary entity. Validate CUI checksums, IBAN format, dates, and financial totals.\n\n${documentsText}`,
         },
       ],
     },

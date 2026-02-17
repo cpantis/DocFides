@@ -3,7 +3,7 @@ import { Worker, type Job } from 'bullmq';
 interface OcrJobData {
   documentId: string;
   projectId: string;
-  r2Key: string;
+  storageKey: string;
   filename: string;
   mimeType: string;
   sha256: string;
@@ -16,11 +16,11 @@ const connection = {
 export const ocrWorker = new Worker<OcrJobData>(
   'ocr',
   async (job: Job<OcrJobData>) => {
-    const { documentId, projectId, r2Key, filename, mimeType, sha256 } = job.data;
+    const { documentId, projectId, storageKey, filename, mimeType, sha256 } = job.data;
     console.log(`[OCR] Processing document ${documentId} (${filename})`);
 
     const { connectToDatabase, DocumentModel, Extraction, Audit } = await import('../src/lib/db');
-    const { downloadFile } = await import('../src/lib/storage/download');
+    const { readTempFile } = await import('../src/lib/storage/tmp-storage');
     // Use parse-pipeline which tries Python first, then falls back to Node.js
     // native extractors (pdf-parse, mammoth, xlsx, tesseract.js)
     const { parseDocument } = await import('../src/lib/parsing/parse-pipeline');
@@ -53,9 +53,9 @@ export const ocrWorker = new Worker<OcrJobData>(
     await DocumentModel.findByIdAndUpdate(documentId, { status: 'processing' });
     await job.updateProgress(10);
 
-    // 3. Download from R2
-    console.log(`[OCR] Downloading ${r2Key}...`);
-    const fileBuffer = await downloadFile(r2Key);
+    // 3. Read from /tmp storage
+    console.log(`[OCR] Reading ${storageKey}...`);
+    const fileBuffer = await readTempFile(storageKey);
     await job.updateProgress(25);
 
     // 4. Parse document (Python → Node.js fallback)

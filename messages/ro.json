@@ -207,6 +207,17 @@
       "costPerDoc": "Cost mediu/document",
       "timeSaved": "Ore economisite",
       "recentActivity": "Activitate recentă"
+    },
+    "tags": {
+      "title": "Etichete documente",
+      "description": "Gestionează etichetele pentru a categoriza documentele sursă pe rol de entitate. Etichetele ajută pipeline-ul AI să asocieze datele cu entitățile corecte.",
+      "addTag": "Adaugă etichetă",
+      "noTags": "Nu ai încă etichete. Adaugă prima etichetă pentru a categoriza documentele.",
+      "namePlaceholder": "Numele etichetei...",
+      "manageTags": "Gestionează etichete",
+      "selectTag": "Selectează etichetă",
+      "removeTag": "Șterge etichetă",
+      "addLabel": "+ Etichetă"
     }
   },
   "project": {

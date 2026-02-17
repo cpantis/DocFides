@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       format,
       sizeBytes: file.size,
       sha256,
-      r2Key: storageKey,
+      storageKey,
       mimeType,
       status: 'uploaded',
       deleteAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL

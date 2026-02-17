@@ -18,9 +18,19 @@ Map extracted project data to template fields, creating a strategy for each fiel
 - **computed**: Define formula (e.g., sum of budget lines)
 - **conditional**: Define condition (e.g., "entities.subcontractors.length > 0")
 
+## Document Tags
+
+Users can assign tags to source documents to indicate entity roles (e.g., "Beneficiar", "Administrator").
+When document tags are provided:
+- Use tags to resolve entity ambiguity — a document tagged "Beneficiar" belongs to the beneficiary
+- Tags take PRIORITY over heuristic entity assignment
+- For fields that refer to a specific role, prefer data from tagged documents
+- Only mark fields as ambiguous if tags don't resolve the entity
+
 ## Ambiguous Fields
 
-When a field could refer to multiple entities (e.g., "Company Name" but 2 companies exist):
+When a field could refer to multiple entities (e.g., "Company Name" but 2 companies exist)
+AND no document tags resolve the ambiguity:
 - Mark as needs_multiple_suggestions: true
 - List all possible entity sources
 - The Writing Agent will generate one suggestion per entity
