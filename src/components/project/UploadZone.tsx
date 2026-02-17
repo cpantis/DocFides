@@ -248,38 +248,42 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
             <div
               key={item.id}
               className={cn(
-                'flex items-center gap-3 rounded-xl border px-4 py-3',
+                'rounded-xl border px-4 py-3',
                 item.status === 'error' ? 'border-red-200 bg-red-50' :
                 item.status === 'success' ? 'border-green-200 bg-green-50' :
                 item.status === 'uploading' ? 'border-blue-200 bg-blue-50' :
                 'border-gray-200 bg-white'
               )}
             >
-              {item.status === 'error' ? (
-                <AlertCircle className="h-4 w-4 flex-shrink-0 text-error" />
-              ) : item.status === 'uploading' ? (
-                <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin text-blue-500" />
-              ) : (
-                <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
+              <div className="flex items-center gap-3">
+                {item.status === 'error' ? (
+                  <AlertCircle className="h-4 w-4 flex-shrink-0 text-error" />
+                ) : item.status === 'uploading' ? (
+                  <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin text-blue-500" />
+                ) : (
+                  <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
+                )}
+                <span className="min-w-0 flex-1 truncate text-sm text-gray-700">{item.file.name}</span>
+                {isSource && item.status === 'pending' && (
+                  <InlineTagSelector
+                    tags={tags}
+                    selectedTagId={item.tagId}
+                    onSelect={(tagId) => setFileTag(item.id, tagId)}
+                    addLabel={tt('addLabel')}
+                  />
+                )}
+                <span className="flex-shrink-0 text-xs text-gray-400">
+                  {(item.file.size / (1024 * 1024)).toFixed(1)} MB
+                </span>
+                {(item.status === 'pending' || item.status === 'error') && (
+                  <button onClick={() => removeFile(item.id)} className="text-gray-400 hover:text-gray-600">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {item.error && (
+                <p className="mt-1.5 ml-7 text-sm font-medium text-error">{item.error}</p>
               )}
-              <span className="min-w-0 flex-1 truncate text-sm text-gray-700">{item.file.name}</span>
-              {isSource && item.status === 'pending' && (
-                <InlineTagSelector
-                  tags={tags}
-                  selectedTagId={item.tagId}
-                  onSelect={(tagId) => setFileTag(item.id, tagId)}
-                  addLabel={tt('addLabel')}
-                />
-              )}
-              <span className="flex-shrink-0 text-xs text-gray-400">
-                {(item.file.size / (1024 * 1024)).toFixed(1)} MB
-              </span>
-              {item.status === 'pending' && (
-                <button onClick={() => removeFile(item.id)} className="text-gray-400 hover:text-gray-600">
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-              {item.error && <span className="text-xs text-error">{item.error}</span>}
             </div>
           ))}
 
