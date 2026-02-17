@@ -22,6 +22,7 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File | null;
     const projectId = formData.get('projectId') as string;
     const role = formData.get('role') as string;
+    const tagId = formData.get('tagId') as string | null;
 
     uploadDocumentSchema.parse({ projectId, role });
 
@@ -86,6 +87,7 @@ export async function POST(req: NextRequest) {
       mimeType,
       status: 'uploaded',
       deleteAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
+      ...(tagId && role === 'source' ? { tagId } : {}),
     });
 
     // Update project document references

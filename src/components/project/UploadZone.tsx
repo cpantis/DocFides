@@ -1,9 +1,10 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useCallback, useRef, useState } from 'react';
-import { Upload, X, FileText, AlertCircle, Loader2 } from 'lucide-react';
+import { useCallback, useRef, useState, useEffect } from 'react';
+import { Upload, X, FileText, AlertCircle, Loader2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { useTags, type Tag } from '@/lib/hooks/use-tags';
 import type { DocumentRole } from '@/lib/db/models/document';
 
 interface UploadZoneProps {
@@ -19,6 +20,7 @@ interface UploadedFile {
   file: File;
   status: 'pending' | 'uploading' | 'success' | 'error';
   error?: string;
+  tagId?: string;
 }
 
 const ACCEPTED_EXTENSIONS = '.pdf,.docx,.doc,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.tiff,.tif';
@@ -32,10 +34,13 @@ function nextFileId(): string {
 export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadComplete }: UploadZoneProps) {
   const t = useTranslations('project.upload');
   const tc = useTranslations('common');
+  const tt = useTranslations('dashboard.tags');
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const uploadingRef = useRef(false);
+  const isSource = role === 'source';
+  const { tags } = useTags();
 
   const remainingSlots = maxFiles - existingCount;
 
@@ -85,6 +90,9 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
           formData.append('file', item.file);
           formData.append('projectId', projectId);
           formData.append('role', role);
+          if (item.tagId) {
+            formData.append('tagId', item.tagId);
+          }
 
           const res = await fetch('/api/documents', { method: 'POST', body: formData });
           const resData = await res.json().catch(() => ({ error: 'Upload failed' }));
@@ -121,6 +129,10 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
   };
 
   const hasPending = files.some((f) => f.status === 'pending');
+
+  const setFileTag = (fileId: string, tagId: string | undefined) => {
+    setFiles((prev) => prev.map((f) => f.id === fileId ? { ...f, tagId } : f));
+  };
 
   const openFilePicker = useCallback(() => {
     if (isUploading) return;
@@ -183,6 +195,14 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
                 <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
               )}
               <span className="min-w-0 flex-1 truncate text-sm text-gray-700">{item.file.name}</span>
+              {isSource && item.status === 'pending' && (
+                <InlineTagSelector
+                  tags={tags}
+                  selectedTagId={item.tagId}
+                  onSelect={(tagId) => setFileTag(item.id, tagId)}
+                  addLabel={tt('addLabel')}
+                />
+              )}
               <span className="flex-shrink-0 text-xs text-gray-400">
                 {(item.file.size / (1024 * 1024)).toFixed(1)} MB
               </span>
@@ -204,6 +224,90 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
               {isUploading ? tc('processing') : `${tc('upload')} ${files.filter((f) => f.status === 'pending').length}`}
             </button>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Inline tag selector for pending source files ── */
+
+interface InlineTagSelectorProps {
+  tags: Tag[];
+  selectedTagId?: string;
+  onSelect: (tagId: string | undefined) => void;
+  addLabel: string;
+}
+
+function InlineTagSelector({ tags, selectedTagId, onSelect, addLabel }: InlineTagSelectorProps) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [open]);
+
+  const selectedTag = tags.find((t) => t._id === selectedTagId);
+
+  return (
+    <div ref={ref} className="relative flex-shrink-0">
+      {selectedTag ? (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white"
+          style={{ backgroundColor: selectedTag.color }}
+        >
+          {selectedTag.name}
+          <ChevronDown className="h-3 w-3" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+          className="rounded-full border border-dashed border-gray-300 px-2 py-0.5 text-xs text-gray-500 transition-colors hover:border-primary-400 hover:text-primary-600"
+        >
+          {addLabel}
+        </button>
+      )}
+
+      {open && (
+        <div className="absolute right-0 top-7 z-20 min-w-[160px] rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+          {selectedTag && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onSelect(undefined); setOpen(false); }}
+              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-400 hover:bg-gray-50"
+            >
+              <X className="h-3 w-3" />
+              Remove tag
+            </button>
+          )}
+          {tags.map((tag) => (
+            <button
+              key={tag._id}
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onSelect(tag._id); setOpen(false); }}
+              className={cn(
+                'flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-gray-50',
+                tag._id === selectedTagId ? 'bg-gray-50 font-medium text-gray-900' : 'text-gray-700'
+              )}
+            >
+              <span
+                className="h-3 w-3 flex-shrink-0 rounded-full"
+                style={{ backgroundColor: tag.color }}
+              />
+              {tag.name}
+            </button>
+          ))}
         </div>
       )}
     </div>
