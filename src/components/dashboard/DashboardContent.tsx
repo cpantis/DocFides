@@ -11,6 +11,7 @@ import { UsageChart } from './UsageChart';
 import { TimeSavedBadge } from './TimeSavedBadge';
 import { RecentActivity } from './RecentActivity';
 import { AlertBanner } from './AlertBanner';
+import { TagManager } from './TagManager';
 
 export function DashboardContent() {
   const t = useTranslations('dashboard');
@@ -63,6 +64,17 @@ export function DashboardContent() {
           <UsageChart />
           <TimeSavedBadge hours={stats?.timeSavedHours ?? 0} />
           <RecentActivity items={stats?.recentActivity ?? []} />
+        </div>
+
+        {/* Document tags */}
+        <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h2 className="font-heading text-lg font-semibold text-gray-900">
+            {t('tags.title')}
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">{t('tags.description')}</p>
+          <div className="mt-4">
+            <TagManager />
+          </div>
         </div>
 
         {/* Projects list */}
