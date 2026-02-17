@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
-import { connectToDatabase, Project, Audit } from '@/lib/db';
+import { connectToDatabase, Project, DocumentModel, Audit } from '@/lib/db';
+import { PIPELINE_STAGES_ORDER } from '@/types/pipeline';
 import { runPipelineBackground } from '@/lib/ai/pipeline-runner';
 
 const startPipelineSchema = z.object({
@@ -23,8 +24,35 @@ export async function POST(req: NextRequest) {
     }
 
     if (project.status === 'processing') {
-      return NextResponse.json({ error: 'Pipeline already running' }, { status: 409 });
+      // Check if pipeline is genuinely active (has a stage currently running)
+      const progress = (project.pipelineProgress ?? []) as Array<{ stage: string; status: string }>;
+      const hasRunningStage = progress.some((s) => s.status === 'running');
+      if (hasRunningStage) {
+        return NextResponse.json({ error: 'Pipeline already running' }, { status: 409 });
+      }
+      // Pipeline is stuck in 'processing' with no running stage — allow re-trigger
+      console.warn('[PIPELINE] Project stuck in processing without active stage — allowing re-trigger');
     }
+
+    // Determine which stages to run (skip model if no model documents)
+    const modelDocs = await DocumentModel.countDocuments({
+      projectId: body.projectId,
+      role: 'model',
+      status: { $ne: 'deleted' },
+    });
+    const stages = PIPELINE_STAGES_ORDER.filter(
+      (stage) => stage !== 'model' || modelDocs > 0
+    );
+
+    // Initialize pipelineProgress NOW (before background task) so the
+    // frontend status polling immediately sees all stages as 'queued'.
+    const pipelineProgress = stages.map((stage) => ({
+      stage,
+      status: 'queued' as const,
+    }));
+    await Project.findByIdAndUpdate(body.projectId, {
+      $set: { pipelineProgress, status: 'processing' },
+    });
 
     // Try to queue via BullMQ (Redis). If Redis is unavailable, fall back to inline execution.
     let dispatched: 'queued' | 'inline' = 'inline';
@@ -69,6 +97,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: error.errors }, { status: 400 });
     }
     console.error('[PIPELINE_POST]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' });
   }
 }

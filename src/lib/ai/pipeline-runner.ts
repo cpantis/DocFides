@@ -71,23 +71,32 @@ async function failPipelineEarly(
 
   console.error(`[Pipeline] Cannot start: ${errorMessage}`);
 
+  // Update the first stage in existing pipelineProgress as 'failed',
+  // keeping remaining stages as 'queued' so the UI shows the failure correctly.
+  const project = await Project.findById(projectId).lean();
+  const existing = (project?.pipelineProgress ?? []) as Array<{ stage: string; status: string }>;
+
+  const updatedProgress = existing.length > 0
+    ? existing.map((s, i) =>
+        i === 0
+          ? { ...s, status: 'failed', error: errorMessage, completedAt: new Date() }
+          : s
+      )
+    : [{ stage: 'parser', status: 'failed', error: errorMessage, completedAt: new Date() }];
+
   await Project.findByIdAndUpdate(projectId, {
     $set: {
       status: 'draft',
-      pipelineProgress: [{
-        stage: 'extractor',
-        status: 'failed',
-        error: errorMessage,
-        completedAt: new Date(),
-      }],
+      pipelineProgress: updatedProgress,
     },
   });
 
+  const failedStage = existing[0]?.stage ?? 'parser';
   await Audit.create({
     userId,
     projectId,
     action: 'pipeline_failed',
-    details: { stage: 'extractor', error: errorMessage },
+    details: { stage: failedStage, error: errorMessage },
   });
 }
 
@@ -146,14 +155,17 @@ export async function runPipelineBackground(
     (stage) => stage !== 'model' || hasModel
   );
 
-  // Initialize all stages as queued
-  const pipelineProgress = stages.map((stage) => ({
-    stage,
-    status: 'queued' as const,
-  }));
-  await Project.findByIdAndUpdate(projectId, {
-    $set: { pipelineProgress, status: 'processing' },
-  });
+  // pipelineProgress is already initialized by the route handler.
+  // If somehow it wasn't (e.g., called from BullMQ worker), initialize now.
+  if (!project.pipelineProgress || project.pipelineProgress.length === 0) {
+    const pipelineProgress = stages.map((stage) => ({
+      stage,
+      status: 'queued' as const,
+    }));
+    await Project.findByIdAndUpdate(projectId, {
+      $set: { pipelineProgress, status: 'processing' },
+    });
+  }
 
   console.log(`[Pipeline] Starting AI pipeline for project ${projectId} (${sourceCount} source docs)`);
 

@@ -57,7 +57,10 @@ export function ProcessingPageContent({ projectId }: ProcessingPageContentProps)
   const projectStatus = statusData?.data?.status;
   const stagesFromAPI = statusData?.data?.stages ?? [];
   const isReady = projectStatus === 'ready' || projectStatus === 'exported';
-  const isFailed = stagesFromAPI.some((s) => s.status === 'failed');
+  const hasFailedStage = stagesFromAPI.some((s) => s.status === 'failed');
+  // Detect silent failure: project reverted to 'draft' without completing
+  const isSilentFailure = projectStatus === 'draft' && stagesFromAPI.length > 0 && !isReady;
+  const isFailed = hasFailedStage || isSilentFailure;
 
   // Trigger pipeline on mount
   const startPipeline = useCallback(async () => {
