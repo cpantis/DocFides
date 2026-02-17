@@ -3,6 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useProject } from '@/lib/hooks/use-projects';
+import { useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -23,6 +24,12 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
   const t = useTranslations('project.upload');
   const tc = useTranslations('common');
   const { project, isLoading, mutate } = useProject(projectId);
+  const [sourceRefreshKey, setSourceRefreshKey] = useState(0);
+
+  const refreshSources = () => {
+    mutate();
+    setSourceRefreshKey((k) => k + 1);
+  };
 
   const openFilePicker = (role: string, maxFiles: number) => {
     const input = document.createElement('input');
@@ -202,9 +209,7 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
           <p className="mt-1 text-sm text-gray-500">{t('sourceHint')}</p>
 
           {/* Uploaded source documents with tag selectors */}
-          {sourceCount > 0 && (
-            <SourceDocumentList projectId={projectId} />
-          )}
+          <SourceDocumentList projectId={projectId} refreshKey={sourceRefreshKey} />
 
           <div className="mt-4">
             <UploadZone
@@ -212,7 +217,7 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
               role="source"
               maxFiles={10}
               existingCount={sourceCount}
-              onUploadComplete={() => mutate()}
+              onUploadComplete={refreshSources}
             />
           </div>
         </section>

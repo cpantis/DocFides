@@ -17,11 +17,13 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface SourceDocumentListProps {
   projectId: string;
+  /** Increment this to force SWR revalidation after uploads */
+  refreshKey?: number;
 }
 
-export function SourceDocumentList({ projectId }: SourceDocumentListProps) {
+export function SourceDocumentList({ projectId, refreshKey }: SourceDocumentListProps) {
   const { data, mutate } = useSWR<{ data: SourceDoc[] }>(
-    `/api/projects/${projectId}/documents?role=source`,
+    `/api/projects/${projectId}/documents?role=source&v=${refreshKey ?? 0}`,
     fetcher
   );
 
