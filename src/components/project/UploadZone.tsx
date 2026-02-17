@@ -28,6 +28,49 @@ const ACCEPTED_EXTENSIONS = '.pdf,.docx,.doc,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.ti
 const ACCEPTED_EXTS = new Set(['pdf', 'docx', 'doc', 'xlsx', 'xls', 'csv', 'jpg', 'jpeg', 'png', 'tiff', 'tif']);
 const MAX_SIZE_MB = 25;
 const MAX_FILENAME_LENGTH = 255;
+const CHUNK_SIZE = 512 * 1024; // 512KB per chunk — well under Next.js 1MB body limit
+
+/**
+ * Upload a file in chunks to bypass Next.js's 1MB body parser limit.
+ * Each chunk is sent as a raw ArrayBuffer with metadata in headers.
+ * The server assembles chunks on the last one and saves to /tmp.
+ */
+async function uploadFileChunked(
+  file: File,
+  projectId: string,
+  role: string,
+  tagId?: string,
+): Promise<void> {
+  const uploadId = crypto.randomUUID();
+  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+  const commonHeaders: Record<string, string> = {
+    'Content-Type': 'application/octet-stream',
+    'x-upload-id': uploadId,
+    'x-total-chunks': String(totalChunks),
+    'x-filename': encodeURIComponent(file.name),
+    'x-project-id': projectId,
+    'x-role': role,
+  };
+  if (tagId) commonHeaders['x-tag-id'] = tagId;
+
+  for (let i = 0; i < totalChunks; i++) {
+    const start = i * CHUNK_SIZE;
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    const chunk = file.slice(start, end);
+
+    const res = await fetch('/api/upload/chunk', {
+      method: 'POST',
+      headers: { ...commonHeaders, 'x-chunk-index': String(i) },
+      body: chunk,
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({ error: `Chunk ${i} failed (${res.status})` }));
+      throw new Error(typeof data.error === 'string' ? data.error : `Upload failed (${res.status})`);
+    }
+  }
+}
 
 let fileCounter = 0;
 function nextFileId(): string {
@@ -160,33 +203,7 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
         );
 
         try {
-          // Send file as raw body with metadata in headers — bypasses Next.js 1MB body parser
-          const res = await fetch('/api/upload', {
-            method: 'POST',
-            headers: {
-              'Content-Type': item.file.type || 'application/octet-stream',
-              'x-filename': encodeURIComponent(item.file.name),
-              'x-project-id': projectId,
-              'x-role': role,
-              ...(item.tagId ? { 'x-tag-id': item.tagId } : {}),
-            },
-            body: item.file,
-          });
-
-          const responseText = await res.text();
-          let resData: { error?: string; data?: unknown };
-          try {
-            resData = JSON.parse(responseText);
-          } catch {
-            throw new Error(`Upload failed (${res.status}: ${res.statusText})`);
-          }
-
-          if (!res.ok) {
-            throw new Error(
-              (typeof resData.error === 'string' ? resData.error : null)
-              || `Upload failed (${res.status})`
-            );
-          }
+          await uploadFileChunked(item.file, projectId, role, item.tagId);
 
           setFiles((prev) =>
             prev.map((f) => f.id === item.id ? { ...f, status: 'success' as const } : f)
