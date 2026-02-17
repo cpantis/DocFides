@@ -101,12 +101,6 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
             throw new Error(resData.error || `Upload failed (${res.status})`);
           }
 
-          // Check if document extraction succeeded (API returns actual document status)
-          if (resData?.data?.status === 'failed') {
-            const errors = resData.data.parsingErrors?.join('; ') || 'Text extraction failed';
-            throw new Error(errors);
-          }
-
           setFiles((prev) =>
             prev.map((f) => f.id === item.id ? { ...f, status: 'success' as const } : f)
           );

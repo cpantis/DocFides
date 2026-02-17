@@ -11,7 +11,7 @@ import {
   MAX_MODEL_FILES,
 } from '@/lib/utils/validation';
 import { hashFile } from '@/lib/utils/hash';
-import { saveTempFile, deleteTempFile, generateStorageKey } from '@/lib/storage/tmp-storage';
+import { saveTempFile, generateStorageKey } from '@/lib/storage/tmp-storage';
 
 export async function POST(req: NextRequest) {
   try {
@@ -99,34 +99,7 @@ export async function POST(req: NextRequest) {
       await Project.findByIdAndUpdate(projectId, { $push: { modelDocuments: doc._id } });
     }
 
-    // Extract text immediately from the in-memory buffer (no re-read from disk)
-    try {
-      const { parseAndStore } = await import('@/lib/parsing/parse-pipeline');
-      await parseAndStore(
-        String(doc._id),
-        projectId,
-        buffer,
-        file.name,
-        mimeType,
-        sha256
-      );
-
-      await DocumentModel.findByIdAndUpdate(doc._id, { status: 'extracted' });
-
-      // Cleanup temp file — extraction data is now in MongoDB
-      await deleteTempFile(storageKey);
-    } catch (extractError) {
-      console.error('[DOCUMENTS_POST] Text extraction failed:', extractError);
-      await DocumentModel.findByIdAndUpdate(doc._id, {
-        status: 'failed',
-        parsingErrors: [String(extractError)],
-      });
-      // Keep temp file so pipeline parser stage can retry
-    }
-
-    // Re-fetch to return actual current status
-    const updatedDoc = await DocumentModel.findById(doc._id).lean();
-    return NextResponse.json({ data: updatedDoc ?? doc }, { status: 201 });
+    return NextResponse.json({ data: doc }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 });
