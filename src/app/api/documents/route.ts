@@ -13,6 +13,9 @@ import {
 import { hashFile } from '@/lib/utils/hash';
 import { saveTempFile, generateStorageKey } from '@/lib/storage/tmp-storage';
 
+// Allow up to 25MB uploads in this Route Handler
+export const maxDuration = 60; // seconds
+
 export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth();

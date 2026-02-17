@@ -169,10 +169,23 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
           }
 
           const res = await fetch('/api/documents', { method: 'POST', body: formData });
-          const resData = await res.json().catch(() => ({ error: 'Upload failed' }));
+
+          // Read body as text first, then parse — avoids losing error details
+          const responseText = await res.text();
+          let resData: { error?: string | Array<{ message?: string }>; data?: unknown };
+          try {
+            resData = JSON.parse(responseText);
+          } catch {
+            console.error('[UploadZone] Non-JSON response:', res.status, responseText.slice(0, 500));
+            throw new Error(`Upload failed (${res.status}: ${res.statusText})`);
+          }
 
           if (!res.ok) {
-            throw new Error(resData.error || `Upload failed (${res.status})`);
+            // Handle ZodError arrays from the server
+            const msg = Array.isArray(resData.error)
+              ? resData.error.map((e) => e.message).join(', ')
+              : resData.error;
+            throw new Error(msg || `Upload failed (${res.status})`);
           }
 
           setFiles((prev) =>
