@@ -6,7 +6,6 @@ import { Upload, X, FileText, AlertCircle, Loader2, ChevronDown } from 'lucide-r
 import { cn } from '@/lib/utils/cn';
 import { useTags, type Tag } from '@/lib/hooks/use-tags';
 import { EXTENSION_TO_MIME, MAX_SOURCE_FILES, MAX_MODEL_FILES } from '@/lib/utils/validation';
-import { uploadDocument } from '@/app/actions/upload-document';
 import type { DocumentRole } from '@/lib/db/models/document';
 
 interface UploadZoneProps {
@@ -161,29 +160,39 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
         );
 
         try {
-          const formData = new FormData();
-          formData.append('file', item.file);
-          formData.append('projectId', projectId);
-          formData.append('role', role);
-          if (item.tagId) {
-            formData.append('tagId', item.tagId);
+          // Send file as raw body with metadata in headers — bypasses Next.js 1MB body parser
+          const res = await fetch('/api/upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': item.file.type || 'application/octet-stream',
+              'x-filename': encodeURIComponent(item.file.name),
+              'x-project-id': projectId,
+              'x-role': role,
+              ...(item.tagId ? { 'x-tag-id': item.tagId } : {}),
+            },
+            body: item.file,
+          });
+
+          const responseText = await res.text();
+          let resData: { error?: string; data?: unknown };
+          try {
+            resData = JSON.parse(responseText);
+          } catch {
+            throw new Error(`Upload failed (${res.status}: ${res.statusText})`);
           }
 
-          const result = await uploadDocument(formData);
-
-          if (!result.success) {
-            throw new Error(result.error || 'Upload failed');
+          if (!res.ok) {
+            throw new Error(
+              (typeof resData.error === 'string' ? resData.error : null)
+              || `Upload failed (${res.status})`
+            );
           }
 
           setFiles((prev) =>
             prev.map((f) => f.id === item.id ? { ...f, status: 'success' as const } : f)
           );
         } catch (err) {
-          // Server Actions throw generic errors when the response is malformed (e.g. body size exceeded)
-          const raw = err instanceof Error ? err.message : String(err);
-          const message = raw.includes('unexpected response')
-            ? 'File too large or server error — check terminal for details'
-            : raw || t('errors.fileReadError');
+          const message = err instanceof Error ? err.message : t('errors.fileReadError');
           setFiles((prev) =>
             prev.map((f) => f.id === item.id ? { ...f, status: 'error' as const, error: message } : f)
           );
