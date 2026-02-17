@@ -47,9 +47,8 @@ export async function extractFromPdf(
     // Get page count from info
     try {
       const info = await parser.getInfo();
-      // numPages is available in the info object
-      const infoObj = info as unknown as Record<string, unknown>;
-      pageCount = (infoObj['numPages'] as number) ?? 1;
+      // pdf-parse v2: InfoResult has .total for page count
+      pageCount = (info as { total?: number }).total ?? Math.max(1, Math.ceil(nativeText.length / 3000));
     } catch {
       // Fallback page count estimation
       pageCount = Math.max(1, Math.ceil(nativeText.length / 3000));

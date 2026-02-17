@@ -87,10 +87,16 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
           formData.append('role', role);
 
           const res = await fetch('/api/documents', { method: 'POST', body: formData });
+          const resData = await res.json().catch(() => ({ error: 'Upload failed' }));
 
           if (!res.ok) {
-            const data = await res.json().catch(() => ({ error: 'Upload failed' }));
-            throw new Error(data.error || `Upload failed (${res.status})`);
+            throw new Error(resData.error || `Upload failed (${res.status})`);
+          }
+
+          // Check if document extraction succeeded (API returns actual document status)
+          if (resData?.data?.status === 'failed') {
+            const errors = resData.data.parsingErrors?.join('; ') || 'Text extraction failed';
+            throw new Error(errors);
           }
 
           setFiles((prev) =>

@@ -16,9 +16,10 @@ interface PipelineStage {
 interface ProcessingProgressProps {
   stages: PipelineStage[];
   overallStatus: 'processing' | 'completed' | 'failed';
+  onRetry?: () => void;
 }
 
-export function ProcessingProgress({ stages, overallStatus }: ProcessingProgressProps) {
+export function ProcessingProgress({ stages, overallStatus, onRetry }: ProcessingProgressProps) {
   const t = useTranslations('project.processing');
 
   // Find the first failed stage's error message
@@ -100,7 +101,10 @@ export function ProcessingProgress({ stages, overallStatus }: ProcessingProgress
             </div>
           </div>
           <div className="mt-4 text-center">
-            <button className="rounded-lg bg-error px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors">
+            <button
+              onClick={onRetry}
+              className="rounded-lg bg-error px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 transition-colors"
+            >
               {t('retryButton')}
             </button>
           </div>

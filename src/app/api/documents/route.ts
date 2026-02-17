@@ -154,7 +154,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ data: doc }, { status: 201 });
+    // Re-fetch to return the actual current status (may have changed to 'extracted' or 'failed')
+    const updatedDoc = await DocumentModel.findById(doc._id).lean();
+    return NextResponse.json({ data: updatedDoc ?? doc }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 });

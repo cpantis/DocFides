@@ -244,6 +244,7 @@
     "processing": {
       "title": "Procesare AI",
       "steps": {
+        "parsing": "Se parsează și se extrage textul din documente...",
         "extracting": "Se extrag datele din documente...",
         "analyzing": "Se analizează stilul din documentul model...",
         "templateAnalysis": "Se analizează câmpurile șablonului...",

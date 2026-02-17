@@ -244,6 +244,7 @@
     "processing": {
       "title": "AI Processing",
       "steps": {
+        "parsing": "Parsing and extracting text from documents...",
         "extracting": "Extracting data from documents...",
         "analyzing": "Analyzing style from model document...",
         "templateAnalysis": "Analyzing template fields...",

@@ -29,6 +29,7 @@ interface PipelineStatusResponse {
 }
 
 const STAGE_TRANSLATION_MAP: Record<string, string> = {
+  parser: 'parsing',
   extractor: 'extracting',
   model: 'analyzing',
   template: 'templateAnalysis',
@@ -97,6 +98,7 @@ export function ProcessingPageContent({ projectId }: ProcessingPageContentProps)
         error: s.error,
       }))
     : [
+        { id: 'parser', translationKey: 'parsing', status: 'pending' as const },
         { id: 'extractor', translationKey: 'extracting', status: 'pending' as const },
         { id: 'model', translationKey: 'analyzing', status: 'pending' as const },
         { id: 'template', translationKey: 'templateAnalysis', status: 'pending' as const },
@@ -143,7 +145,15 @@ export function ProcessingPageContent({ projectId }: ProcessingPageContentProps)
           </div>
         )}
 
-        <ProcessingProgress stages={stages} overallStatus={overallStatus} />
+        <ProcessingProgress
+          stages={stages}
+          overallStatus={overallStatus}
+          onRetry={() => {
+            triggerRef.current = false;
+            setStartError(null);
+            startPipeline();
+          }}
+        />
 
         {isReady && (
           <div className="mt-6 flex justify-end">
