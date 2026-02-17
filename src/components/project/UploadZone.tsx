@@ -20,6 +20,7 @@ interface UploadedFile {
   id: string;
   file: File;
   status: 'pending' | 'uploading' | 'success' | 'error';
+  progress: number;
   error?: string;
   tagId?: string;
 }
@@ -28,48 +29,51 @@ const ACCEPTED_EXTENSIONS = '.pdf,.docx,.doc,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.ti
 const ACCEPTED_EXTS = new Set(['pdf', 'docx', 'doc', 'xlsx', 'xls', 'csv', 'jpg', 'jpeg', 'png', 'tiff', 'tif']);
 const MAX_SIZE_MB = 25;
 const MAX_FILENAME_LENGTH = 255;
-const CHUNK_SIZE = 512 * 1024; // 512KB per chunk — well under Next.js 1MB body limit
 
 /**
- * Upload a file in chunks to bypass Next.js's 1MB body parser limit.
- * Each chunk is sent as a raw ArrayBuffer with metadata in headers.
- * The server assembles chunks on the last one and saves to /tmp.
+ * Upload a file directly via FormData POST to /api/upload.
+ * Uses XMLHttpRequest for real upload progress tracking.
  */
-async function uploadFileChunked(
+function uploadFileDirect(
   file: File,
   projectId: string,
   role: string,
+  onProgress: (percent: number) => void,
   tagId?: string,
 ): Promise<void> {
-  const uploadId = crypto.randomUUID();
-  const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('projectId', projectId);
+    formData.append('role', role);
+    if (tagId) formData.append('tagId', tagId);
 
-  const commonHeaders: Record<string, string> = {
-    'Content-Type': 'application/octet-stream',
-    'x-upload-id': uploadId,
-    'x-total-chunks': String(totalChunks),
-    'x-filename': encodeURIComponent(file.name),
-    'x-project-id': projectId,
-    'x-role': role,
-  };
-  if (tagId) commonHeaders['x-tag-id'] = tagId;
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/upload');
 
-  for (let i = 0; i < totalChunks; i++) {
-    const start = i * CHUNK_SIZE;
-    const end = Math.min(start + CHUNK_SIZE, file.size);
-    const chunk = file.slice(start, end);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
 
-    const res = await fetch('/api/upload/chunk', {
-      method: 'POST',
-      headers: { ...commonHeaders, 'x-chunk-index': String(i) },
-      body: chunk,
-    });
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        onProgress(100);
+        resolve();
+      } else {
+        try {
+          const data = JSON.parse(xhr.responseText);
+          reject(new Error(typeof data.error === 'string' ? data.error : `Upload failed (${xhr.status})`));
+        } catch {
+          reject(new Error(`Upload failed (${xhr.status})`));
+        }
+      }
+    };
 
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({ error: `Chunk ${i} failed (${res.status})` }));
-      throw new Error(typeof data.error === 'string' ? data.error : `Upload failed (${res.status})`);
-    }
-  }
+    xhr.onerror = () => reject(new Error('Network error'));
+    xhr.send(formData);
+  });
 }
 
 let fileCounter = 0;
@@ -166,12 +170,13 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
           id: nextFileId(),
           file,
           status: 'error' as const,
+          progress: 0,
           error: t(`errors.${error.key}`, error.params),
         };
       }
       validCount++;
       queuedNames.add(file.name.toLowerCase());
-      return { id: nextFileId(), file, status: 'pending' as const };
+      return { id: nextFileId(), file, status: 'pending' as const, progress: 0 };
     });
     setFiles((prev) => [...prev, ...uploadFiles]);
   }, [remainingSlots, files, role, t]);
@@ -199,14 +204,24 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
       for (const item of pendingFiles) {
         // Mark as uploading by ID (safe across state changes)
         setFiles((prev) =>
-          prev.map((f) => f.id === item.id ? { ...f, status: 'uploading' as const } : f)
+          prev.map((f) => f.id === item.id ? { ...f, status: 'uploading' as const, progress: 0 } : f)
         );
 
         try {
-          await uploadFileChunked(item.file, projectId, role, item.tagId);
+          await uploadFileDirect(
+            item.file,
+            projectId,
+            role,
+            (percent) => {
+              setFiles((prev) =>
+                prev.map((f) => f.id === item.id ? { ...f, progress: percent } : f)
+              );
+            },
+            item.tagId,
+          );
 
           setFiles((prev) =>
-            prev.map((f) => f.id === item.id ? { ...f, status: 'success' as const } : f)
+            prev.map((f) => f.id === item.id ? { ...f, status: 'success' as const, progress: 100 } : f)
           );
         } catch (err) {
           const message = err instanceof Error ? err.message : t('errors.fileReadError');
@@ -311,6 +326,17 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
                   </button>
                 )}
               </div>
+              {item.status === 'uploading' && (
+                <div className="mt-2 ml-7 mr-1">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-blue-100">
+                    <div
+                      className="h-full rounded-full bg-blue-500 transition-all duration-200"
+                      style={{ width: `${item.progress}%` }}
+                    />
+                  </div>
+                  <p className="mt-0.5 text-right text-xs text-blue-500">{item.progress}%</p>
+                </div>
+              )}
               {item.error && (
                 <p className="mt-1.5 ml-7 text-sm font-medium text-error">{item.error}</p>
               )}

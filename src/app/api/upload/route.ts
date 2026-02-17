@@ -5,11 +5,16 @@ import { hashFile } from '@/lib/utils/hash';
 import { saveTempFile, generateStorageKey } from '@/lib/storage/tmp-storage';
 
 /**
- * Streaming file upload — saves to /tmp only. No database involved.
+ * POST /api/upload
  *
- * The file is sent as raw body (not FormData) to bypass Next.js's
- * 1MB body parser limit on both Route Handlers and Server Actions.
- * Metadata (filename, projectId, role) is sent via headers.
+ * Direct file upload via FormData. Body size limit is 25MB
+ * (configured in next.config.ts via serverActions.bodySizeLimit).
+ *
+ * FormData fields:
+ *   file      — the file blob
+ *   projectId — project ID
+ *   role      — source | template | model
+ *   tagId     — optional tag ID (source files only)
  */
 export async function POST(req: NextRequest) {
   try {
@@ -18,61 +23,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Metadata from headers (client sends these alongside the raw body)
-    const rawFilename = req.headers.get('x-filename');
-    const filename = rawFilename ? decodeURIComponent(rawFilename) : null;
-    const projectId = req.headers.get('x-project-id');
-    const role = req.headers.get('x-role');
-    const declaredMime = req.headers.get('content-type') || 'application/octet-stream';
-    const tagId = req.headers.get('x-tag-id') || undefined;
+    const formData = await req.formData();
+    const file = formData.get('file');
+    const projectId = formData.get('projectId');
+    const role = formData.get('role');
+    const tagId = formData.get('tagId') || undefined;
 
-    if (!filename || !projectId || !role) {
-      return NextResponse.json(
-        { error: 'Missing required headers: x-filename, x-project-id, x-role' },
-        { status: 400 },
-      );
+    if (!(file instanceof File)) {
+      return NextResponse.json({ error: 'Missing file' }, { status: 400 });
     }
 
-    if (!['source', 'template', 'model'].includes(role)) {
+    if (!projectId || typeof projectId !== 'string') {
+      return NextResponse.json({ error: 'Missing projectId' }, { status: 400 });
+    }
+
+    if (!role || typeof role !== 'string' || !['source', 'template', 'model'].includes(role)) {
       return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
     }
 
-    // Resolve MIME type from declared type + filename extension
-    const mimeType = resolveMimeType(declaredMime, filename);
+    const filename = file.name;
+
+    if (!validateFileSize(file.size)) {
+      return NextResponse.json({ error: 'File too large (max 25MB)' }, { status: 400 });
+    }
+
+    if (file.size === 0) {
+      return NextResponse.json({ error: 'Empty file' }, { status: 400 });
+    }
+
+    const mimeType = resolveMimeType(file.type || 'application/octet-stream', filename);
     if (!validateMimeType(mimeType)) {
       return NextResponse.json({ error: 'Unsupported file format' }, { status: 400 });
     }
 
-    // Read the raw body stream — bypasses Next.js body parser limit
-    if (!req.body) {
-      return NextResponse.json({ error: 'No file body' }, { status: 400 });
-    }
-
-    const chunks: Uint8Array[] = [];
-    const reader = req.body.getReader();
-    let totalSize = 0;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      totalSize += value.byteLength;
-      // Enforce size limit during streaming — don't buffer the whole file first
-      if (!validateFileSize(totalSize)) {
-        return NextResponse.json({ error: 'File too large (max 25MB)' }, { status: 400 });
-      }
-      chunks.push(value);
-    }
-
-    if (totalSize === 0) {
-      return NextResponse.json({ error: 'Empty file' }, { status: 400 });
-    }
-
-    const buffer = Buffer.concat(chunks);
+    const buffer = Buffer.from(await file.arrayBuffer());
     const sha256 = await hashFile(buffer);
     const storageKey = generateStorageKey(userId, projectId, filename);
     const format = filename.split('.').pop()?.toLowerCase() ?? 'unknown';
 
-    // Save to /tmp — the only I/O operation
     await saveTempFile(storageKey, buffer);
 
     return NextResponse.json({
@@ -82,14 +70,14 @@ export async function POST(req: NextRequest) {
         originalFilename: filename,
         mimeType,
         format,
-        sizeBytes: totalSize,
+        sizeBytes: file.size,
         role,
         projectId,
-        ...(tagId ? { tagId } : {}),
+        ...(typeof tagId === 'string' && tagId ? { tagId } : {}),
       },
     }, { status: 201 });
   } catch (error) {
-    console.error('[UPLOAD_STREAM]', error);
+    console.error('[UPLOAD]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
