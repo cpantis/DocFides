@@ -5,6 +5,7 @@ import { useCallback, useRef, useState, useEffect } from 'react';
 import { Upload, X, FileText, AlertCircle, Loader2, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useTags, type Tag } from '@/lib/hooks/use-tags';
+import { EXTENSION_TO_MIME, MAX_SOURCE_FILES, MAX_MODEL_FILES } from '@/lib/utils/validation';
 import type { DocumentRole } from '@/lib/db/models/document';
 
 interface UploadZoneProps {
@@ -24,11 +25,76 @@ interface UploadedFile {
 }
 
 const ACCEPTED_EXTENSIONS = '.pdf,.docx,.doc,.xlsx,.xls,.csv,.jpg,.jpeg,.png,.tiff,.tif';
+const ACCEPTED_EXTS = new Set(['pdf', 'docx', 'doc', 'xlsx', 'xls', 'csv', 'jpg', 'jpeg', 'png', 'tiff', 'tif']);
 const MAX_SIZE_MB = 25;
+const MAX_FILENAME_LENGTH = 255;
 
 let fileCounter = 0;
 function nextFileId(): string {
   return `file_${++fileCounter}_${Date.now()}`;
+}
+
+interface FileValidationError {
+  key: string;
+  params?: Record<string, string>;
+}
+
+function validateFile(
+  file: File,
+  slotIndex: number,
+  slotsAvailable: number,
+  queuedNames: Set<string>,
+  role: DocumentRole,
+): FileValidationError | null {
+  // 1. Empty file
+  if (file.size === 0) return { key: 'fileEmpty' };
+
+  // 2. Too large
+  if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+    return { key: 'fileTooLarge', params: { size: (file.size / (1024 * 1024)).toFixed(1), max: String(MAX_SIZE_MB) } };
+  }
+
+  // 3. No extension
+  const dotIndex = file.name.lastIndexOf('.');
+  const ext = dotIndex > 0 ? file.name.slice(dotIndex + 1).toLowerCase() : '';
+  if (!ext) return { key: 'noExtension' };
+
+  // 4. Unsupported format
+  if (!ACCEPTED_EXTS.has(ext)) {
+    return { key: 'unsupportedFormat', params: { ext: `.${ext}` } };
+  }
+
+  // 5. MIME type mismatch — browser says one thing, extension says another
+  if (file.type && file.type !== 'application/octet-stream') {
+    const expectedMime = EXTENSION_TO_MIME[`.${ext}`];
+    if (expectedMime && file.type !== expectedMime) {
+      const isJpegVariant = file.type === 'image/jpeg' && (ext === 'jpg' || ext === 'jpeg');
+      const isTiffVariant = file.type === 'image/tiff' && (ext === 'tiff' || ext === 'tif');
+      if (!isJpegVariant && !isTiffVariant) {
+        return { key: 'mimeTypeSuspicious', params: { declared: file.type, expected: expectedMime } };
+      }
+    }
+  }
+
+  // 6. Filename too long
+  if (file.name.length > MAX_FILENAME_LENGTH) {
+    return { key: 'filenameTooLong', params: { length: String(file.name.length), max: String(MAX_FILENAME_LENGTH) } };
+  }
+
+  // 7. Invalid characters (control characters, null bytes)
+  if (/[\x00-\x1f]/.test(file.name)) return { key: 'filenameInvalidChars' };
+
+  // 8. Duplicate filename already in queue
+  if (queuedNames.has(file.name.toLowerCase())) return { key: 'duplicateFile' };
+
+  // 9–11. Slot limits (role-specific)
+  if (slotIndex >= slotsAvailable) {
+    if (role === 'source') return { key: 'maxSourceFiles', params: { max: String(MAX_SOURCE_FILES) } };
+    if (role === 'model') return { key: 'maxModelFiles', params: { max: String(MAX_MODEL_FILES) } };
+    return { key: 'maxTemplateFiles' };
+  }
+
+  return null;
 }
 
 export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadComplete }: UploadZoneProps) {
@@ -47,17 +113,25 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
   const handleFiles = useCallback((fileList: FileList) => {
     const activeCount = files.filter((f) => f.status === 'pending' || f.status === 'uploading').length;
     const slotsAvailable = remainingSlots - activeCount;
-    if (slotsAvailable <= 0) return;
+    const queuedNames = new Set(files.map((f) => f.file.name.toLowerCase()));
 
-    const newFiles = Array.from(fileList).slice(0, slotsAvailable);
-    const uploadFiles: UploadedFile[] = newFiles.map((file) => {
-      if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-        return { id: nextFileId(), file, status: 'error' as const, error: `File too large (max ${MAX_SIZE_MB}MB)` };
+    let validCount = 0;
+    const uploadFiles: UploadedFile[] = Array.from(fileList).map((file) => {
+      const error = validateFile(file, validCount, slotsAvailable, queuedNames, role);
+      if (error) {
+        return {
+          id: nextFileId(),
+          file,
+          status: 'error' as const,
+          error: t(`errors.${error.key}`, error.params),
+        };
       }
+      validCount++;
+      queuedNames.add(file.name.toLowerCase());
       return { id: nextFileId(), file, status: 'pending' as const };
     });
     setFiles((prev) => [...prev, ...uploadFiles]);
-  }, [remainingSlots, files]);
+  }, [remainingSlots, files, role, t]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -105,7 +179,7 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
             prev.map((f) => f.id === item.id ? { ...f, status: 'success' as const } : f)
           );
         } catch (err) {
-          const message = err instanceof Error ? err.message : 'Upload failed';
+          const message = err instanceof Error ? err.message : t('errors.fileReadError');
           setFiles((prev) =>
             prev.map((f) => f.id === item.id ? { ...f, status: 'error' as const, error: message } : f)
           );

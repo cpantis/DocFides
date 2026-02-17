@@ -250,7 +250,21 @@
       "maxSize": "Maximum {max}MB per file",
       "acceptedFormats": "Accepted: PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, PNG, TIFF",
       "dropFiles": "Drop files here or click to browse",
-      "remaining": "remaining"
+      "remaining": "remaining",
+      "errors": {
+        "fileEmpty": "File is empty (0 bytes)",
+        "fileTooLarge": "Too large ({size}MB) — max {max}MB",
+        "noExtension": "No file extension — cannot determine format",
+        "unsupportedFormat": "Format not supported ({ext})",
+        "mimeTypeSuspicious": "File type mismatch — expected {expected}, got {declared}",
+        "filenameTooLong": "Filename too long ({length} chars, max {max})",
+        "filenameInvalidChars": "Filename contains invalid characters",
+        "duplicateFile": "A file with this name is already selected",
+        "maxSourceFiles": "Source file limit reached (max {max})",
+        "maxModelFiles": "Model file limit reached (max {max})",
+        "maxTemplateFiles": "Only one template file allowed",
+        "fileReadError": "Could not read this file"
+      }
     },
     "processing": {
       "title": "AI Processing",

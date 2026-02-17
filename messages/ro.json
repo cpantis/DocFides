@@ -250,7 +250,21 @@
       "maxSize": "Maximum {max}MB per fișier",
       "acceptedFormats": "Acceptate: PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, PNG, TIFF",
       "dropFiles": "Trage fișierele aici sau click pentru a selecta",
-      "remaining": "rămase"
+      "remaining": "rămase",
+      "errors": {
+        "fileEmpty": "Fișierul este gol (0 bytes)",
+        "fileTooLarge": "Prea mare ({size}MB) — max {max}MB",
+        "noExtension": "Fișierul nu are extensie — formatul nu poate fi determinat",
+        "unsupportedFormat": "Format nesuportat ({ext})",
+        "mimeTypeSuspicious": "Tip fișier nepotrivit — se aștepta {expected}, primit {declared}",
+        "filenameTooLong": "Numele fișierului e prea lung ({length} caractere, max {max})",
+        "filenameInvalidChars": "Numele fișierului conține caractere invalide",
+        "duplicateFile": "Un fișier cu acest nume este deja selectat",
+        "maxSourceFiles": "Limita de fișiere sursă atinsă (max {max})",
+        "maxModelFiles": "Limita de fișiere model atinsă (max {max})",
+        "maxTemplateFiles": "Este permis un singur fișier șablon",
+        "fileReadError": "Fișierul nu a putut fi citit"
+      }
     },
     "processing": {
       "title": "Procesare AI",
