@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useCallback, useRef, useState } from 'react';
-import { Upload, X, FileText, AlertCircle, Loader2, Plus } from 'lucide-react';
+import { Upload, X, FileText, AlertCircle, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import type { DocumentRole } from '@/lib/db/models/document';
 
@@ -159,20 +159,6 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
           {t('maxSize', { max: String(MAX_SIZE_MB) })} &middot; {t('maxFiles', { max: String(remainingSlots) })} {t('remaining')}
         </p>
 
-        {/* "+" button — alternative to drag & drop */}
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); openFilePicker(); }}
-          disabled={isUploading || remainingSlots <= 0}
-          className={cn(
-            'absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-lg border-2 transition-colors',
-            'border-gray-300 bg-white text-gray-500 shadow-sm hover:border-primary-400 hover:bg-primary-50 hover:text-primary-600',
-            'disabled:cursor-not-allowed disabled:opacity-40'
-          )}
-          title={t('dropFiles')}
-        >
-          <Plus className="h-5 w-5" />
-        </button>
       </div>
 
       {/* File list */}
