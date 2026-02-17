@@ -6,6 +6,7 @@ import { Upload, X, FileText, AlertCircle, Loader2, ChevronDown } from 'lucide-r
 import { cn } from '@/lib/utils/cn';
 import { useTags, type Tag } from '@/lib/hooks/use-tags';
 import { EXTENSION_TO_MIME, MAX_SOURCE_FILES, MAX_MODEL_FILES } from '@/lib/utils/validation';
+import { uploadDocument } from '@/app/actions/upload-document';
 import type { DocumentRole } from '@/lib/db/models/document';
 
 interface UploadZoneProps {
@@ -168,24 +169,10 @@ export function UploadZone({ projectId, role, maxFiles, existingCount, onUploadC
             formData.append('tagId', item.tagId);
           }
 
-          const res = await fetch('/api/documents', { method: 'POST', body: formData });
+          const result = await uploadDocument(formData);
 
-          // Read body as text first, then parse — avoids losing error details
-          const responseText = await res.text();
-          let resData: { error?: string | Array<{ message?: string }>; data?: unknown };
-          try {
-            resData = JSON.parse(responseText);
-          } catch {
-            console.error('[UploadZone] Non-JSON response:', res.status, responseText.slice(0, 500));
-            throw new Error(`Upload failed (${res.status}: ${res.statusText})`);
-          }
-
-          if (!res.ok) {
-            // Handle ZodError arrays from the server
-            const msg = Array.isArray(resData.error)
-              ? resData.error.map((e) => e.message).join(', ')
-              : resData.error;
-            throw new Error(msg || `Upload failed (${res.status})`);
+          if (!result.success) {
+            throw new Error(result.error || 'Upload failed');
           }
 
           setFiles((prev) =>
