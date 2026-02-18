@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useProject } from '@/lib/hooks/use-projects';
-import { ArrowLeft, FileDown, FileText, Loader2 } from 'lucide-react';
+import { ArrowLeft, FileDown, FileText, Loader2, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 
 interface ExportPageContentProps {
@@ -14,16 +14,35 @@ export function ExportPageContent({ projectId }: ExportPageContentProps) {
   const t = useTranslations('project.export');
   const { project, isLoading } = useProject(projectId);
   const [exporting, setExporting] = useState<'docx' | 'pdf' | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const handleExport = async (format: 'docx' | 'pdf') => {
     setExporting(format);
+    setExportError(null);
     try {
       const res = await fetch('/api/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ projectId, format }),
       });
-      if (!res.ok) throw new Error('Export failed');
+
+      if (!res.ok) {
+        let errorMessage = `Export failed (${res.status})`;
+        try {
+          const errorData = await res.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+          if (errorData.summary) {
+            errorMessage += `: ${errorData.summary}`;
+          }
+        } catch {
+          // Response wasn't JSON — use status text
+        }
+        setExportError(errorMessage);
+        return;
+      }
+
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -31,8 +50,10 @@ export function ExportPageContent({ projectId }: ExportPageContentProps) {
       a.download = `${project?.name ?? 'document'}.${format}`;
       a.click();
       URL.revokeObjectURL(url);
-    } catch {
-      // Error handling will be enhanced in later phases
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : 'An unexpected error occurred during export'
+      );
     } finally {
       setExporting(null);
     }
@@ -75,6 +96,23 @@ export function ExportPageContent({ projectId }: ExportPageContentProps) {
       </header>
 
       <div className="mx-auto max-w-4xl px-6 py-8">
+        {/* Error banner */}
+        {exportError && (
+          <div className="mb-6 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-5 py-4">
+            <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-500" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-red-800">{t('exportFailed')}</p>
+              <p className="mt-1 text-sm text-red-600">{exportError}</p>
+            </div>
+            <button
+              onClick={() => setExportError(null)}
+              className="text-sm text-red-400 hover:text-red-600"
+            >
+              &times;
+            </button>
+          </div>
+        )}
+
         <div className="grid gap-6 md:grid-cols-2">
           {/* DOCX export */}
           <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">

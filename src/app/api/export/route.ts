@@ -46,7 +46,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Template document not found' }, { status: 404 });
     }
 
-    const templateBuffer = await readTempFile(templateDoc.storageKey);
+    let templateBuffer: Buffer;
+    try {
+      templateBuffer = await readTempFile(templateDoc.storageKey);
+    } catch {
+      console.error(
+        `[EXPORT_POST] Template file missing from /tmp: ${templateDoc.storageKey}. ` +
+        'This usually happens after a server restart. Re-upload the template to fix.'
+      );
+      return NextResponse.json(
+        {
+          error: 'Template file is no longer available on the server. Please re-upload the template document and re-run the pipeline.',
+          code: 'TEMPLATE_FILE_MISSING',
+        },
+        { status: 410 }
+      );
+    }
 
     // Build generation input from pipeline outputs
     const fieldCompletions = (project.fieldCompletions ?? {}) as Record<string, unknown>;
