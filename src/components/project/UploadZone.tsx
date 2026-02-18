@@ -31,7 +31,7 @@ const MAX_SIZE_MB = 25;
 const MAX_FILENAME_LENGTH = 255;
 
 /**
- * Upload a file directly via FormData POST to /api/upload.
+ * Upload a file directly via FormData POST to /api/documents.
  * Uses XMLHttpRequest for real upload progress tracking.
  */
 function uploadFileDirect(
@@ -49,7 +49,7 @@ function uploadFileDirect(
     if (tagId) formData.append('tagId', tagId);
 
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/upload');
+    xhr.open('POST', '/api/documents');
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
