@@ -156,7 +156,7 @@ export async function runPipelineBackground(
   );
 
   // pipelineProgress is already initialized by the route handler.
-  // If somehow it wasn't (e.g., called from BullMQ worker), initialize now.
+  // Re-initialize as safety net if it's missing.
   if (!project.pipelineProgress || project.pipelineProgress.length === 0) {
     const pipelineProgress = stages.map((stage) => ({
       stage,
