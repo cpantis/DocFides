@@ -269,13 +269,13 @@
     "processing": {
       "title": "Procesare AI",
       "steps": {
-        "parsing": "Se parsează și se extrage textul din documente...",
-        "extracting": "Se extrag datele din documente...",
+        "parsing": "Se citesc documentele (OCR, text, tabele)...",
+        "extracting": "AI identifică datele: nume, CUI, sume, date...",
         "analyzing": "Se analizează stilul din documentul model...",
-        "templateAnalysis": "Se analizează câmpurile șablonului...",
-        "mapping": "Se mapează datele pe câmpurile șablonului...",
-        "writing": "Se generează textul...",
-        "verifying": "Se verifică calitatea..."
+        "templateAnalysis": "Se identifică câmpurile din șablon...",
+        "mapping": "Se potrivesc datele pe câmpurile șablonului...",
+        "writing": "AI generează textul final...",
+        "verifying": "Se verifică acuratețea și coerența..."
       },
       "complete": "Procesare completă!",
       "failed": "Procesarea a eșuat. Reîncearcă.",

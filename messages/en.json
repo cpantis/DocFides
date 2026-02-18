@@ -269,13 +269,13 @@
     "processing": {
       "title": "AI Processing",
       "steps": {
-        "parsing": "Parsing and extracting text from documents...",
-        "extracting": "Extracting data from documents...",
+        "parsing": "Reading documents (OCR, text, tables)...",
+        "extracting": "AI identifies data: names, IDs, amounts, dates...",
         "analyzing": "Analyzing style from model document...",
-        "templateAnalysis": "Analyzing template fields...",
+        "templateAnalysis": "Identifying template fields...",
         "mapping": "Mapping data to template fields...",
         "writing": "Generating text...",
-        "verifying": "Verifying quality..."
+        "verifying": "Verifying accuracy and coherence..."
       },
       "complete": "Processing complete!",
       "failed": "Processing failed. Please retry.",
