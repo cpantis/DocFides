@@ -10,6 +10,7 @@ interface Project {
   sourceDocuments: string[];
   templateDocument?: string;
   modelDocuments: string[];
+  aiCost?: number;
   createdAt: string;
   updatedAt: string;
 }

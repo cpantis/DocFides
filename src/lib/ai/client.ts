@@ -33,14 +33,37 @@ export interface AgentResult {
 }
 
 /**
- * Log cost for an API call.
+ * Calculate cost for an API call.
  */
-function logCost(label: string, model: string, inputTokens: number, outputTokens: number): void {
+function calculateCost(model: string, inputTokens: number, outputTokens: number): number {
   const pricing = PRICES[model] ?? PRICES['claude-sonnet-4-5-20250929']!;
-  const cost = inputTokens * pricing.input + outputTokens * pricing.output;
+  return inputTokens * pricing.input + outputTokens * pricing.output;
+}
+
+/**
+ * Log cost and accumulate on the project document in MongoDB.
+ */
+async function logAndAccumulateCost(
+  label: string,
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  projectId?: string
+): Promise<void> {
+  const cost = calculateCost(model, inputTokens, outputTokens);
   console.log(
     `[${label}] input: ${inputTokens} tokens, output: ${outputTokens} tokens, cost: $${cost.toFixed(4)} (${model})`
   );
+
+  if (projectId && cost > 0) {
+    try {
+      const { connectToDatabase, Project } = await import('@/lib/db');
+      await connectToDatabase();
+      await Project.findByIdAndUpdate(projectId, { $inc: { aiCost: cost } });
+    } catch (err) {
+      console.warn('[AI] Failed to accumulate cost:', err);
+    }
+  }
 }
 
 /**
@@ -51,7 +74,8 @@ function logCost(label: string, model: string, inputTokens: number, outputTokens
 export async function callAgentWithRetry(
   params: MessageCreateParamsNonStreaming,
   expectedToolName: string,
-  agentLabel?: string
+  agentLabel?: string,
+  projectId?: string
 ): Promise<AgentResult> {
   const anthropic = getAnthropicClient();
   let lastError: Error | null = null;
@@ -67,7 +91,7 @@ export async function callAgentWithRetry(
       );
 
       if (toolUse && toolUse.type === 'tool_use') {
-        logCost(label, params.model, response.usage.input_tokens, response.usage.output_tokens);
+        await logAndAccumulateCost(label, params.model, response.usage.input_tokens, response.usage.output_tokens, projectId);
         return {
           output: toolUse.input as Record<string, unknown>,
           tokenUsage: {
@@ -104,7 +128,7 @@ export async function callAgentWithRetry(
         const totalOutput = response.usage.output_tokens + retryResponse.usage.output_tokens;
 
         if (retryToolUse && retryToolUse.type === 'tool_use') {
-          logCost(label, params.model, totalInput, totalOutput);
+          await logAndAccumulateCost(label, params.model, totalInput, totalOutput, projectId);
           return {
             output: retryToolUse.input as Record<string, unknown>,
             tokenUsage: { inputTokens: totalInput, outputTokens: totalOutput },
@@ -114,7 +138,7 @@ export async function callAgentWithRetry(
         // Extract any tool use as fallback
         const anyTool = retryResponse.content.find((block: ContentBlock) => block.type === 'tool_use');
         if (anyTool && anyTool.type === 'tool_use') {
-          logCost(label, params.model, totalInput, totalOutput);
+          await logAndAccumulateCost(label, params.model, totalInput, totalOutput, projectId);
           return {
             output: anyTool.input as Record<string, unknown>,
             tokenUsage: { inputTokens: totalInput, outputTokens: totalOutput },

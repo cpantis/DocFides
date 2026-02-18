@@ -24,7 +24,8 @@ Only extract visible text — never invent content.`;
 export async function extractPageWithVision(
   pageImageBuffer: Buffer,
   pageNumber: number,
-  filename: string
+  filename: string,
+  projectId?: string
 ): Promise<{
   text: string;
   blocks: ExtractionBlock[];
@@ -84,7 +85,9 @@ export async function extractPageWithVision(
         },
       ],
     },
-    'save_page_extraction'
+    'save_page_extraction',
+    'VisionFallback',
+    projectId
   );
 
   const rawText = (result.output.text as string) ?? '';

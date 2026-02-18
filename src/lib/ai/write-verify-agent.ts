@@ -17,6 +17,7 @@ export interface WriteVerifyInput {
   projectData: Record<string, unknown>;
   styleGuide: Record<string, unknown>;
   fieldMap: Record<string, unknown>;
+  projectId?: string;
 }
 
 export async function runWriteVerifyAgent(input: WriteVerifyInput): Promise<AgentResult> {
@@ -111,6 +112,7 @@ export async function runWriteVerifyAgent(input: WriteVerifyInput): Promise<Agen
       ],
     },
     'save_write_verify',
-    'WriteVerify'
+    'WriteVerify',
+    input.projectId
   );
 }

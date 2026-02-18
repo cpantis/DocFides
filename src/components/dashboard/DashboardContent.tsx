@@ -126,6 +126,7 @@ export function DashboardContent() {
                   status={project.status}
                   sourceCount={project.sourceDocuments.length}
                   updatedAt={project.updatedAt}
+                  aiCost={project.aiCost}
                   onDelete={handleDelete}
                 />
               ))}

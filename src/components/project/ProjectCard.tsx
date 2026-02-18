@@ -12,6 +12,7 @@ interface ProjectCardProps {
   status: 'draft' | 'uploading' | 'processing' | 'ready' | 'exported';
   sourceCount: number;
   updatedAt: string;
+  aiCost?: number;
   onDelete?: (id: string) => void;
 }
 
@@ -23,7 +24,7 @@ const statusConfig = {
   exported: { icon: CheckCircle2, color: 'bg-primary-50 text-primary-600', dot: 'bg-primary-400' },
 } as const;
 
-export function ProjectCard({ id, name, status, sourceCount, updatedAt, onDelete }: ProjectCardProps) {
+export function ProjectCard({ id, name, status, sourceCount, updatedAt, aiCost, onDelete }: ProjectCardProps) {
   const t = useTranslations('project');
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -93,6 +94,11 @@ export function ProjectCard({ id, name, status, sourceCount, updatedAt, onDelete
           <Clock className="h-3.5 w-3.5" />
           {timeAgo}
         </span>
+        {aiCost != null && aiCost > 0 && (
+          <span className="ml-auto font-mono text-[11px] text-gray-300">
+            ${aiCost.toFixed(4)}
+          </span>
+        )}
       </div>
     </div>
   );

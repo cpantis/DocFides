@@ -439,6 +439,7 @@ async function runStage(
           filename: templateDoc.filename,
           content: templateDoc.content,
         },
+        projectId: context.projectId,
       });
     }
 
@@ -453,6 +454,7 @@ async function runStage(
         projectData: context.projectData,
         styleGuide: context.modelMap ?? {},
         fieldMap: context.draftPlan,
+        projectId: context.projectId,
       });
     }
 

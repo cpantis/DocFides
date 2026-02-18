@@ -25,6 +25,7 @@ export interface IProject extends Document {
   draftPlan?: Record<string, unknown>;
   fieldCompletions?: Record<string, unknown>;
   qualityReport?: Record<string, unknown>;
+  aiCost?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -55,6 +56,7 @@ const ProjectSchema = new Schema<IProject>(
     draftPlan: { type: Schema.Types.Mixed },
     fieldCompletions: { type: Schema.Types.Mixed },
     qualityReport: { type: Schema.Types.Mixed },
+    aiCost: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

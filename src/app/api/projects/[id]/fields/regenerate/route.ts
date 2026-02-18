@@ -92,7 +92,9 @@ Generate a fresh, accurate value for this field. Follow Romanian formatting conv
           },
         ],
       },
-      'save_field_completion'
+      'save_field_completion',
+      'FieldRegenerate',
+      id
     );
 
     const newValue = (result.output.value as string) ?? '';

@@ -29,6 +29,7 @@ export interface ExtractAnalyzeInput {
     filename: string;
     content: string;
   };
+  projectId?: string;
 }
 
 export async function runExtractAnalyzeAgent(input: ExtractAnalyzeInput): Promise<AgentResult> {
@@ -185,7 +186,8 @@ export async function runExtractAnalyzeAgent(input: ExtractAnalyzeInput): Promis
       ],
     },
     'save_extract_analyze',
-    'ExtractAnalyze'
+    'ExtractAnalyze',
+    input.projectId
   );
 
   // Post-validation: check for model data leakage in project_data
