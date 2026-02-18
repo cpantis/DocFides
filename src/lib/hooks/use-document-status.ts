@@ -1,6 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
+import { fetcher } from '@/lib/utils/fetcher';
 
 interface DocumentStatus {
   documentId: string;
@@ -14,8 +15,6 @@ interface DocumentStatus {
   processingTimeMs: number | null;
   errors: string[];
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function useDocumentStatus(documentId: string | null) {
   const { data, error, isLoading } = useSWR<{ data: DocumentStatus }>(

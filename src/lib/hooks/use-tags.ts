@@ -1,6 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
+import { fetcher } from '@/lib/utils/fetcher';
 
 export interface Tag {
   _id: string;
@@ -10,8 +11,6 @@ export interface Tag {
   createdAt: string;
   updatedAt: string;
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function useTags() {
   const { data, error, isLoading, mutate } = useSWR<{ data: Tag[] }>(

@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X, AlertCircle } from 'lucide-react';
 import { useTags, type Tag } from '@/lib/hooks/use-tags';
 import { cn } from '@/lib/utils/cn';
 
@@ -21,52 +21,60 @@ const PRESET_COLORS = [
 
 export function TagManager() {
   const t = useTranslations('dashboard.tags');
-  const { tags, mutate } = useTags();
+  const tc = useTranslations('common');
+  const { tags, isError, mutate } = useTags();
   const [newTagName, setNewTagName] = useState('');
   const [newTagColor, setNewTagColor] = useState(PRESET_COLORS[0]!);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const handleCreate = async () => {
     if (!newTagName.trim()) return;
+    setActionError(null);
     try {
-      await fetch('/api/tags', {
+      const res = await fetch('/api/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newTagName.trim(), color: newTagColor }),
       });
+      if (!res.ok) throw new Error();
       setNewTagName('');
       setNewTagColor(PRESET_COLORS[0]!);
       setIsAdding(false);
       mutate();
     } catch {
-      // Error handled by API
+      setActionError(tc('error'));
     }
   };
 
   const handleUpdate = async (id: string) => {
     if (!editName.trim()) return;
+    setActionError(null);
     try {
-      await fetch(`/api/tags/${id}`, {
+      const res = await fetch(`/api/tags/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editName.trim(), color: editColor }),
       });
+      if (!res.ok) throw new Error();
       setEditingId(null);
       mutate();
     } catch {
-      // Error handled by API
+      setActionError(tc('error'));
     }
   };
 
   const handleDelete = async (id: string) => {
+    setActionError(null);
     try {
-      await fetch(`/api/tags/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/tags/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
       mutate();
     } catch {
-      // Error handled by API
+      setActionError(tc('error'));
     }
   };
 
@@ -76,8 +84,33 @@ export function TagManager() {
     setEditColor(tag.color);
   };
 
+  if (isError) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <AlertCircle className="h-4 w-4 shrink-0" />
+        <span>{tc('error')}</span>
+        <button
+          onClick={() => mutate()}
+          className="ml-auto text-xs font-medium underline hover:no-underline"
+        >
+          {tc('retry')}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
+      {actionError && (
+        <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{actionError}</span>
+          <button onClick={() => setActionError(null)} className="ml-auto text-gray-400 hover:text-gray-600">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Tag list */}
       <div className="flex flex-wrap gap-2">
         {tags.map((tag) =>

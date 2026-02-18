@@ -3,6 +3,7 @@
 import { FileText } from 'lucide-react';
 import { DocumentTagBadge } from './DocumentTagBadge';
 import useSWR from 'swr';
+import { fetcher } from '@/lib/utils/fetcher';
 
 interface SourceDoc {
   _id: string;
@@ -12,8 +13,6 @@ interface SourceDoc {
   sizeBytes: number;
   tagId?: string;
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 interface SourceDocumentListProps {
   projectId: string;

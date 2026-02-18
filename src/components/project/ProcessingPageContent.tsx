@@ -7,6 +7,7 @@ import { useProject } from '@/lib/hooks/use-projects';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { ProcessingProgress } from './ProcessingProgress';
 import useSWR from 'swr';
+import { fetcher } from '@/lib/utils/fetcher';
 
 interface ProcessingPageContentProps {
   projectId: string;
@@ -37,8 +38,6 @@ const STAGE_TRANSLATION_MAP: Record<string, string> = {
   writing: 'writing',
   verification: 'verifying',
 };
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function ProcessingPageContent({ projectId }: ProcessingPageContentProps) {
   const t = useTranslations('project');

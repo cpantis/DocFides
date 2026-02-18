@@ -1,6 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
+import { fetcher } from '@/lib/utils/fetcher';
 
 interface UserStats {
   credits: {
@@ -17,8 +18,6 @@ interface UserStats {
     timestamp: string;
   }[];
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function useUserStats() {
   const { data, error, isLoading } = useSWR<{ data: UserStats }>(

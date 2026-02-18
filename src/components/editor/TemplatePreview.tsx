@@ -6,6 +6,7 @@ import { FileText, Copy, BookOpen, Table2, Calculator, GitBranch } from 'lucide-
 import { cn } from '@/lib/utils/cn';
 import type { EditorField, FieldStatus } from '@/lib/hooks/use-editor-state';
 import useSWR from 'swr';
+import { fetcher } from '@/lib/utils/fetcher';
 
 interface TemplatePreviewProps {
   projectId: string;
@@ -37,8 +38,6 @@ interface TextsResponse {
     model: { filename: string; text: string }[];
   };
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 /**
  * Template preview showing the REAL extracted document text

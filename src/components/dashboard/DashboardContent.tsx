@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
-import { Plus, LayoutDashboard } from 'lucide-react';
+import { Plus, LayoutDashboard, AlertCircle } from 'lucide-react';
 import { useProjects } from '@/lib/hooks/use-projects';
 import { useUserStats } from '@/lib/hooks/use-user-stats';
 import { ProjectCard } from '@/components/project/ProjectCard';
@@ -15,8 +15,9 @@ import { TagManager } from './TagManager';
 
 export function DashboardContent() {
   const t = useTranslations('dashboard');
-  const { projects, isLoading, mutate } = useProjects();
-  const { stats } = useUserStats();
+  const tc = useTranslations('common');
+  const { projects, isLoading, isError, mutate } = useProjects();
+  const { stats, isError: statsError } = useUserStats();
 
   const handleDelete = async (id: string) => {
     try {
@@ -52,6 +53,20 @@ export function DashboardContent() {
       </header>
 
       <div className="mx-auto max-w-7xl px-6 py-8">
+        {/* Connection error */}
+        {(isError || statsError) && (
+          <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{tc('error')}</span>
+            <button
+              onClick={() => mutate()}
+              className="ml-auto text-xs font-medium underline hover:no-underline"
+            >
+              {tc('retry')}
+            </button>
+          </div>
+        )}
+
         {/* Credit alerts */}
         {stats && <AlertBanner creditPercent={stats.credits.percentUsed} />}
 

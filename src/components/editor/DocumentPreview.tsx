@@ -6,6 +6,7 @@ import { FileText, Check, Pencil, SkipForward, ChevronDown, ChevronRight } from 
 import { cn } from '@/lib/utils/cn';
 import type { EditorField, FieldStatus } from '@/lib/hooks/use-editor-state';
 import useSWR from 'swr';
+import { fetcher } from '@/lib/utils/fetcher';
 
 interface DocumentPreviewProps {
   projectId: string;
@@ -36,8 +37,6 @@ interface TextsResponse {
     model: { filename: string; text: string }[];
   };
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 /**
  * Left pane: shows REAL source document texts with collapsible sections,

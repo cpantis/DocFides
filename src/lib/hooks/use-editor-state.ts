@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useMemo, useRef } from 'react';
 import useSWR from 'swr';
+import { fetcher } from '@/lib/utils/fetcher';
 
 export type FieldStatus = 'pending' | 'accepted' | 'modified' | 'skipped';
 
@@ -42,8 +43,6 @@ interface EditorState {
   draftVersion: number;
   isSavingDraft: boolean;
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 /**
  * Main editor state management hook.
