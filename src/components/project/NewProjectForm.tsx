@@ -19,6 +19,7 @@ export function NewProjectForm() {
   const tc = useTranslations('common');
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
@@ -31,6 +32,7 @@ export function NewProjectForm() {
 
   async function onSubmit(values: FormValues) {
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       const response = await fetch('/api/projects', {
         method: 'POST',
@@ -45,6 +47,7 @@ export function NewProjectForm() {
       const { data } = await response.json();
       router.push(`/project/${data._id}/upload`);
     } catch {
+      setSubmitError(tc('error'));
       setIsSubmitting(false);
     }
   }
@@ -67,6 +70,10 @@ export function NewProjectForm() {
           <p className="mt-1.5 text-sm text-error">{errors.name.message}</p>
         )}
       </div>
+
+      {submitError && (
+        <p className="text-sm text-error">{submitError}</p>
+      )}
 
       <div className="flex items-center gap-3">
         <button
