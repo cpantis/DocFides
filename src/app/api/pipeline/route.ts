@@ -55,8 +55,28 @@ export async function POST(req: NextRequest) {
     });
 
     // Run pipeline inline (fire-and-forget — frontend polls /status for progress)
-    runPipelineBackground(body.projectId, userId).catch((error) => {
+    runPipelineBackground(body.projectId, userId).catch(async (error) => {
       console.error('[PIPELINE_BACKGROUND]', error);
+      // If the background runner crashes before updating any stage,
+      // mark the first stage as failed so the user sees the error.
+      try {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const proj = await Project.findById(body.projectId).lean();
+        const progress = (proj?.pipelineProgress ?? []) as Array<{ stage: string; status: string }>;
+        const allQueued = progress.every((s) => s.status === 'queued');
+        if (allQueued && progress.length > 0) {
+          await Project.findByIdAndUpdate(body.projectId, {
+            $set: {
+              status: 'draft',
+              'pipelineProgress.0.status': 'failed',
+              'pipelineProgress.0.error': errorMsg,
+              'pipelineProgress.0.completedAt': new Date(),
+            },
+          });
+        }
+      } catch (dbErr) {
+        console.error('[PIPELINE_BACKGROUND] Failed to update error state:', dbErr);
+      }
     });
 
     await Audit.create({
