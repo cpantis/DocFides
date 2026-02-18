@@ -93,6 +93,7 @@ export async function runPipeline(
             global_score: output.global_score,
             errors: output.errors,
             warnings: output.warnings,
+            field_scores: output.quality_scores,
             data_leakage_check: output.data_leakage_check,
           };
           break;
@@ -173,6 +174,7 @@ async function saveStageOutput(
         global_score: output.global_score,
         errors: output.errors,
         warnings: output.warnings,
+        field_scores: output.quality_scores,
         data_leakage_check: output.data_leakage_check,
       };
       break;
