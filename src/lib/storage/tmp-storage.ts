@@ -100,6 +100,33 @@ export async function cleanupStaleFiles(maxAgeMs = 24 * 60 * 60 * 1000): Promise
 }
 
 /**
+ * Read a document file with fallback to MongoDB fileData.
+ * Tries /tmp first (fast), falls back to the Document model's fileData field
+ * which survives container restarts on Railway.
+ */
+export async function readDocumentFileWithFallback(
+  storageKey: string,
+  documentId: string
+): Promise<Buffer> {
+  try {
+    return await readTempFile(storageKey);
+  } catch {
+    // /tmp miss — try MongoDB
+    const { DocumentModel } = await import('@/lib/db/models/document');
+    const doc = await DocumentModel.findById(documentId).select('+fileData').lean();
+    if (doc?.fileData) {
+      const buf = Buffer.isBuffer(doc.fileData)
+        ? doc.fileData
+        : Buffer.from(doc.fileData as ArrayBuffer);
+      // Re-populate /tmp for subsequent reads
+      await saveTempFile(storageKey, buf).catch(() => {});
+      return buf;
+    }
+    throw new Error(`File not found in /tmp or MongoDB for document ${documentId}`);
+  }
+}
+
+/**
  * Generate a storage key for a document.
  */
 export function generateStorageKey(

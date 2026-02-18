@@ -457,8 +457,11 @@ async function runStage(
         // Analyze PDF template: detect AcroForm fields, determine type
         const { analyzePdfTemplate } = await import('@/lib/docgen/pdf-template-detector');
 
-        const { readTempFile: readTmp } = await import('@/lib/storage/tmp-storage');
-        const templateBuffer = await readTmp(templateDocRecord.storageKey);
+        const { readDocumentFileWithFallback } = await import('@/lib/storage/tmp-storage');
+        const templateBuffer = await readDocumentFileWithFallback(
+          templateDocRecord.storageKey,
+          String(templateDocRecord._id)
+        );
 
         const pdfAnalysis = await analyzePdfTemplate(templateBuffer);
 

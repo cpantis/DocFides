@@ -18,6 +18,8 @@ export interface IDocument extends Document {
   extractionBlocks?: Record<string, unknown>[];
   tagId?: string;
   parsingErrors?: string[];
+  /** Raw file bytes — stored only for template documents so export survives container restarts. */
+  fileData?: Buffer;
   deleteAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -43,6 +45,7 @@ const DocumentSchema = new Schema<IDocument>(
     extractionBlocks: [{ type: Schema.Types.Mixed }],
     tagId: { type: String },
     parsingErrors: [{ type: String }],
+    fileData: { type: Buffer, select: false },
     deleteAt: { type: Date, index: { expireAfterSeconds: 0 } },
   },
   { timestamps: true }

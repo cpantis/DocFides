@@ -91,6 +91,8 @@ export async function POST(req: NextRequest) {
       status: 'uploaded',
       deleteAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
       ...(tagId && role === 'source' ? { tagId } : {}),
+      // Persist template bytes in MongoDB so export survives container restarts
+      ...(role === 'template' ? { fileData: buffer } : {}),
     });
 
     // Update project document references

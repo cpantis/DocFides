@@ -7,7 +7,7 @@ import { convertDocxToPdf } from '@/lib/docgen/pdf-converter';
 import { validateExportedDocx } from '@/lib/docgen/export-validator';
 import { extractTextFromDocxBuffer } from '@/lib/docgen/docx-text-extractor';
 import { runExportAgent } from '@/lib/ai/export-agent';
-import { readTempFile, saveTempFile, generateStorageKey } from '@/lib/storage/tmp-storage';
+import { readDocumentFileWithFallback, saveTempFile, generateStorageKey } from '@/lib/storage/tmp-storage';
 import { analyzePdfTemplate } from '@/lib/docgen/pdf-template-detector';
 import { fillPdfForm, fillFlatPdf, type PdfFieldPlacement } from '@/lib/docgen/pdf-form-filler';
 
@@ -46,17 +46,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Template document not found' }, { status: 404 });
     }
 
+    // Read template: tries /tmp first, falls back to MongoDB fileData (survives restarts)
     let templateBuffer: Buffer;
     try {
-      templateBuffer = await readTempFile(templateDoc.storageKey);
-    } catch {
-      console.error(
-        `[EXPORT_POST] Template file missing from /tmp: ${templateDoc.storageKey}. ` +
-        'This usually happens after a server restart. Re-upload the template to fix.'
+      templateBuffer = await readDocumentFileWithFallback(
+        templateDoc.storageKey,
+        String(templateDoc._id)
       );
+    } catch {
       return NextResponse.json(
         {
-          error: 'Template file is no longer available on the server. Please re-upload the template document and re-run the pipeline.',
+          error: 'Template file is no longer available. Please re-upload the template document and re-run the pipeline.',
           code: 'TEMPLATE_FILE_MISSING',
         },
         { status: 410 }
