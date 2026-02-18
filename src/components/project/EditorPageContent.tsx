@@ -9,7 +9,7 @@ import { SplitScreen } from '@/components/editor/SplitScreen';
 import { DocumentPreview } from '@/components/editor/DocumentPreview';
 import { TemplatePreview } from '@/components/editor/TemplatePreview';
 import { SuggestionWizard } from '@/components/editor/SuggestionWizard';
-import { ArrowLeft, ArrowRight, Loader2, FileText, LayoutTemplate, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, FileText, LayoutTemplate, Save, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 interface EditorPageContentProps {
@@ -40,6 +40,24 @@ export function EditorPageContent({ projectId }: EditorPageContentProps) {
         <p className="text-gray-500">Project not found</p>
         <Link href="/dashboard" className="mt-4 text-sm text-primary-600 hover:underline">
           {tc('back')}
+        </Link>
+      </div>
+    );
+  }
+
+  // Guard: editor initialization error
+  if (editor.initError) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4 text-center">
+        <AlertCircle className="h-12 w-12 text-red-400" />
+        <p className="mt-4 text-lg font-semibold text-gray-900">Editor Error</p>
+        <p className="mt-2 max-w-md text-sm text-gray-500">{editor.initError}</p>
+        <Link
+          href={`/project/${projectId}/processing`}
+          className="mt-6 inline-flex items-center gap-1.5 text-sm text-primary-600 hover:underline"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {t('viewProcessing')}
         </Link>
       </div>
     );

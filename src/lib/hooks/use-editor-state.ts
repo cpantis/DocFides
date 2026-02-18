@@ -68,17 +68,20 @@ export function useEditorState(projectId: string) {
   const draftTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [initialized, setInitialized] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
 
-  // Initialize fields from project data
+  // Initialize fields from project data (wrapped in try-catch to prevent render crash)
   if (projectData?.data && !initialized) {
-    const project = projectData.data;
-    const fieldCompletions = (project.fieldCompletions ?? {}) as Record<string, unknown>;
-    const templateSchema = (project.templateSchema ?? {}) as Record<string, unknown>;
-    const qualityReport = (project.qualityReport ?? {}) as Record<string, unknown>;
-    const fieldScores = (qualityReport.field_scores ?? {}) as Record<string, Record<string, number>>;
+    try {
+      const project = projectData.data;
+      const fieldCompletions = (project.fieldCompletions ?? {}) as Record<string, unknown>;
+      const templateSchema = (project.templateSchema ?? {}) as Record<string, unknown>;
+      const qualityReport = (project.qualityReport ?? {}) as Record<string, unknown>;
+      const fieldScores = (qualityReport.field_scores ?? {}) as Record<string, Record<string, number>>;
 
-    const schemaFields = (templateSchema.fields ?? []) as Record<string, unknown>[];
-    const completions = (fieldCompletions.fields ?? fieldCompletions) as Record<string, unknown>;
+      const rawFields = templateSchema.fields;
+      const schemaFields = Array.isArray(rawFields) ? rawFields as Record<string, unknown>[] : [];
+      const completions = (fieldCompletions.fields ?? fieldCompletions) as Record<string, unknown>;
 
     const editorFields: EditorField[] = schemaFields.map((sf, idx) => {
       const fieldId = (sf.id as string) ?? `field_${idx}`;
@@ -136,8 +139,13 @@ export function useEditorState(projectId: string) {
       };
     });
 
-    setState((prev) => ({ ...prev, fields: editorFields }));
-    setInitialized(true);
+      setState((prev) => ({ ...prev, fields: editorFields }));
+      setInitialized(true);
+    } catch (err) {
+      console.error('[useEditorState] Failed to initialize fields:', err);
+      setInitError(err instanceof Error ? err.message : 'Failed to parse project data');
+      setInitialized(true); // prevent infinite re-try loop
+    }
   }
 
   // Navigation
@@ -473,6 +481,7 @@ export function useEditorState(projectId: string) {
     isSavingDraft: state.isSavingDraft,
     draftVersion: state.draftVersion,
     hasUnsavedChanges,
+    initError,
     goToField,
     goToNextPending,
     acceptField,
