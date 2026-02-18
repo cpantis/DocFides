@@ -8,18 +8,19 @@ import type { PipelineStage } from '@/types/pipeline';
 
 export function getMockStageOutput(stage: PipelineStage): Record<string, unknown> {
   switch (stage) {
-    case 'extractor':
-      return getMockProjectData();
-    case 'model':
-      return getMockModelMap();
-    case 'template':
-      return getMockTemplateSchema();
-    case 'mapping':
-      return getMockDraftPlan();
-    case 'writing':
-      return getMockFieldCompletions();
-    case 'verification':
-      return getMockQualityReport();
+    case 'parser':
+      return { parsed: 3, failed: 0, skipped: 0, documents: [] };
+    case 'extract_analyze':
+      return {
+        project_data: getMockProjectData(),
+        style_guide: getMockModelMap(),
+        field_map: { ...getMockTemplateSchema(), ...getMockDraftPlan() },
+      };
+    case 'write_verify':
+      return {
+        ...getMockFieldCompletions(),
+        ...getMockQualityReport(),
+      };
     default:
       return {};
   }
@@ -27,12 +28,9 @@ export function getMockStageOutput(stage: PipelineStage): Record<string, unknown
 
 export function getStageOutputField(stage: PipelineStage): string | null {
   switch (stage) {
-    case 'extractor': return 'projectData';
-    case 'model': return 'modelMap';
-    case 'template': return 'templateSchema';
-    case 'mapping': return 'draftPlan';
-    case 'writing': return 'fieldCompletions';
-    case 'verification': return 'qualityReport';
+    case 'parser': return null;
+    case 'extract_analyze': return 'projectData';
+    case 'write_verify': return 'fieldCompletions';
     default: return null;
   }
 }

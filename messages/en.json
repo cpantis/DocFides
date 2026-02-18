@@ -48,7 +48,7 @@
         },
         "process": {
           "title": "AI Processes",
-          "description": "6 AI agents extract, map, and write"
+          "description": "AI extracts, maps, and writes automatically"
         },
         "review": {
           "title": "Review & Edit",
@@ -65,8 +65,8 @@
       "subtitle": "Everything you need for professional documentation",
       "items": {
         "aiPipeline": {
-          "title": "6-Agent AI Pipeline",
-          "description": "Extract, analyze, map, write, verify — each step handled by a specialized AI agent"
+          "title": "AI Pipeline",
+          "description": "Extract, analyze, map, write, verify — all handled by optimized AI agents"
         },
         "ocr": {
           "title": "Advanced OCR",
@@ -270,12 +270,8 @@
       "title": "AI Processing",
       "steps": {
         "parsing": "Reading documents (OCR, text, tables)...",
-        "extracting": "AI identifies data: names, IDs, amounts, dates...",
-        "analyzing": "Analyzing style from model document...",
-        "templateAnalysis": "Identifying template fields...",
-        "mapping": "Mapping data to template fields...",
-        "writing": "Generating text...",
-        "verifying": "Verifying accuracy and coherence..."
+        "extractAnalyzing": "Extracting data, analyzing style, mapping fields...",
+        "writeVerifying": "Generating text and verifying quality..."
       },
       "complete": "Processing complete!",
       "failed": "Processing failed. Please retry.",

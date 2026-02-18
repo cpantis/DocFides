@@ -1,5 +1,5 @@
 /**
- * Shared Anthropic client with retry logic for all AI agents.
+ * Shared Anthropic client with retry logic and cost tracking for all AI agents.
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -8,6 +8,12 @@ import type { ContentBlock } from '@anthropic-ai/sdk/resources/messages';
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [5000, 15000, 45000];
+
+/** Per-token pricing (USD) */
+const PRICES: Record<string, { input: number; output: number }> = {
+  'claude-sonnet-4-5-20250929': { input: 3 / 1_000_000, output: 15 / 1_000_000 },
+  'claude-opus-4-6': { input: 15 / 1_000_000, output: 75 / 1_000_000 },
+};
 
 let client: Anthropic | null = null;
 
@@ -27,16 +33,29 @@ export interface AgentResult {
 }
 
 /**
+ * Log cost for an API call.
+ */
+function logCost(label: string, model: string, inputTokens: number, outputTokens: number): void {
+  const pricing = PRICES[model] ?? PRICES['claude-sonnet-4-5-20250929']!;
+  const cost = inputTokens * pricing.input + outputTokens * pricing.output;
+  console.log(
+    `[${label}] input: ${inputTokens} tokens, output: ${outputTokens} tokens, cost: $${cost.toFixed(4)} (${model})`
+  );
+}
+
+/**
  * Call the Anthropic API with retry logic and tool use extraction.
  * Retries on timeouts, rate limits, and server errors.
  * Re-prompts once if the model doesn't call the expected tool.
  */
 export async function callAgentWithRetry(
   params: MessageCreateParamsNonStreaming,
-  expectedToolName: string
+  expectedToolName: string,
+  agentLabel?: string
 ): Promise<AgentResult> {
   const anthropic = getAnthropicClient();
   let lastError: Error | null = null;
+  const label = agentLabel ?? expectedToolName;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
@@ -48,6 +67,7 @@ export async function callAgentWithRetry(
       );
 
       if (toolUse && toolUse.type === 'tool_use') {
+        logCost(label, params.model, response.usage.input_tokens, response.usage.output_tokens);
         return {
           output: toolUse.input as Record<string, unknown>,
           tokenUsage: {
@@ -80,25 +100,24 @@ export async function callAgentWithRetry(
           (block: ContentBlock) => block.type === 'tool_use' && block.name === expectedToolName
         );
 
+        const totalInput = response.usage.input_tokens + retryResponse.usage.input_tokens;
+        const totalOutput = response.usage.output_tokens + retryResponse.usage.output_tokens;
+
         if (retryToolUse && retryToolUse.type === 'tool_use') {
+          logCost(label, params.model, totalInput, totalOutput);
           return {
             output: retryToolUse.input as Record<string, unknown>,
-            tokenUsage: {
-              inputTokens: response.usage.input_tokens + retryResponse.usage.input_tokens,
-              outputTokens: response.usage.output_tokens + retryResponse.usage.output_tokens,
-            },
+            tokenUsage: { inputTokens: totalInput, outputTokens: totalOutput },
           };
         }
 
         // Extract any tool use as fallback
         const anyTool = retryResponse.content.find((block: ContentBlock) => block.type === 'tool_use');
         if (anyTool && anyTool.type === 'tool_use') {
+          logCost(label, params.model, totalInput, totalOutput);
           return {
             output: anyTool.input as Record<string, unknown>,
-            tokenUsage: {
-              inputTokens: response.usage.input_tokens + retryResponse.usage.input_tokens,
-              outputTokens: response.usage.output_tokens + retryResponse.usage.output_tokens,
-            },
+            tokenUsage: { inputTokens: totalInput, outputTokens: totalOutput },
           };
         }
 
@@ -108,7 +127,6 @@ export async function callAgentWithRetry(
       lastError = error instanceof Error ? error : new Error(String(error));
       const status = (error as { status?: number }).status;
 
-      // Rate limited
       if (status === 429) {
         const retryAfter = (error as { headers?: Record<string, string> }).headers?.['retry-after'];
         const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : (RETRY_DELAYS[attempt] ?? 5000);
@@ -117,7 +135,6 @@ export async function callAgentWithRetry(
         continue;
       }
 
-      // Server error or timeout — retry
       if (status && status >= 500) {
         if (attempt < MAX_RETRIES) {
           const delay = RETRY_DELAYS[attempt] ?? 5000;
@@ -127,7 +144,6 @@ export async function callAgentWithRetry(
         }
       }
 
-      // Overloaded
       if (status === 529) {
         if (attempt < MAX_RETRIES) {
           const delay = RETRY_DELAYS[attempt] ?? 5000;
@@ -137,7 +153,6 @@ export async function callAgentWithRetry(
         }
       }
 
-      // Non-retryable error
       throw lastError;
     }
   }

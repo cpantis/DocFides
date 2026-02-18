@@ -143,17 +143,8 @@ export async function runPipelineBackground(
     return;
   }
 
-  // Determine which stages to run (skip model if no model documents)
-  const modelDocs = await DocumentModel.countDocuments({
-    projectId,
-    role: 'model',
-    status: { $ne: 'deleted' },
-  });
-  const hasModel = modelDocs > 0;
-
-  const stages = PIPELINE_STAGES_ORDER.filter(
-    (stage) => stage !== 'model' || hasModel
-  );
+  // All 3 stages always run (model analysis is handled inside extract_analyze)
+  const stages = PIPELINE_STAGES_ORDER;
 
   // pipelineProgress is already initialized by the route handler.
   // Re-initialize as safety net if it's missing.

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { connectToDatabase, Project, Generation, Audit } from '@/lib/db';
 import { callAgentWithRetry } from '@/lib/ai/client';
 import { AGENT_MODELS } from '@/types/pipeline';
-import { WRITING_SYSTEM_PROMPT } from '@/lib/ai/prompts/writing';
+import { WRITE_VERIFY_SYSTEM_PROMPT } from '@/lib/ai/prompts/write-verify';
 
 const regenerateSchema = z.object({
   fieldId: z.string().min(1),
@@ -57,9 +57,9 @@ export async function POST(
     // Call Writing Agent for single field regeneration
     const result = await callAgentWithRetry(
       {
-        model: AGENT_MODELS.writing,
+        model: AGENT_MODELS.write_verify,
         max_tokens: 4096,
-        system: WRITING_SYSTEM_PROMPT,
+        system: WRITE_VERIFY_SYSTEM_PROMPT,
         tools: [
           {
             name: 'save_field_completion',

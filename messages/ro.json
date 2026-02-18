@@ -48,7 +48,7 @@
         },
         "process": {
           "title": "AI procesează",
-          "description": "6 agenți AI extrag, mapează și scriu"
+          "description": "AI-ul extrage, mapează și scrie automat"
         },
         "review": {
           "title": "Revizuiește și editează",
@@ -65,8 +65,8 @@
       "subtitle": "Tot ce ai nevoie pentru documentație profesională",
       "items": {
         "aiPipeline": {
-          "title": "Pipeline AI cu 6 agenți",
-          "description": "Extrage, analizează, mapează, scrie, verifică — fiecare pas gestionat de un agent AI specializat"
+          "title": "Pipeline AI",
+          "description": "Extrage, analizează, mapează, scrie, verifică — totul gestionat de agenți AI optimizați"
         },
         "ocr": {
           "title": "OCR avansat",
@@ -270,12 +270,8 @@
       "title": "Procesare AI",
       "steps": {
         "parsing": "Se citesc documentele (OCR, text, tabele)...",
-        "extracting": "AI identifică datele: nume, CUI, sume, date...",
-        "analyzing": "Se analizează stilul din documentul model...",
-        "templateAnalysis": "Se identifică câmpurile din șablon...",
-        "mapping": "Se potrivesc datele pe câmpurile șablonului...",
-        "writing": "AI generează textul final...",
-        "verifying": "Se verifică acuratețea și coerența..."
+        "extractAnalyzing": "Se extrag datele, se analizează stilul, se mapează câmpurile...",
+        "writeVerifying": "Se generează textul și se verifică calitatea..."
       },
       "complete": "Procesare completă!",
       "failed": "Procesarea a eșuat. Reîncearcă.",

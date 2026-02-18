@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
-import { connectToDatabase, Project, DocumentModel, Audit } from '@/lib/db';
+import { connectToDatabase, Project, Audit } from '@/lib/db';
 import { PIPELINE_STAGES_ORDER } from '@/types/pipeline';
 import { runPipelineBackground } from '@/lib/ai/pipeline-runner';
 
@@ -34,15 +34,8 @@ export async function POST(req: NextRequest) {
       console.warn('[PIPELINE] Project stuck in processing without active stage — allowing re-trigger');
     }
 
-    // Determine which stages to run (skip model if no model documents)
-    const modelDocs = await DocumentModel.countDocuments({
-      projectId: body.projectId,
-      role: 'model',
-      status: { $ne: 'deleted' },
-    });
-    const stages = PIPELINE_STAGES_ORDER.filter(
-      (stage) => stage !== 'model' || modelDocs > 0
-    );
+    // All 3 stages always run (model analysis is handled inside extract_analyze)
+    const stages = PIPELINE_STAGES_ORDER;
 
     // Initialize pipelineProgress NOW so the frontend status polling
     // immediately sees all stages as 'queued'.

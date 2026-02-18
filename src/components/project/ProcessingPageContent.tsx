@@ -31,12 +31,8 @@ interface PipelineStatusResponse {
 
 const STAGE_TRANSLATION_MAP: Record<string, string> = {
   parser: 'parsing',
-  extractor: 'extracting',
-  model: 'analyzing',
-  template: 'templateAnalysis',
-  mapping: 'mapping',
-  writing: 'writing',
-  verification: 'verifying',
+  extract_analyze: 'extractAnalyzing',
+  write_verify: 'writeVerifying',
 };
 
 export function ProcessingPageContent({ projectId }: ProcessingPageContentProps) {
@@ -101,12 +97,8 @@ export function ProcessingPageContent({ projectId }: ProcessingPageContentProps)
       }))
     : [
         { id: 'parser', translationKey: 'parsing', status: 'pending' as const },
-        { id: 'extractor', translationKey: 'extracting', status: 'pending' as const },
-        { id: 'model', translationKey: 'analyzing', status: 'pending' as const },
-        { id: 'template', translationKey: 'templateAnalysis', status: 'pending' as const },
-        { id: 'mapping', translationKey: 'mapping', status: 'pending' as const },
-        { id: 'writing', translationKey: 'writing', status: 'pending' as const },
-        { id: 'verification', translationKey: 'verifying', status: 'pending' as const },
+        { id: 'extract_analyze', translationKey: 'extractAnalyzing', status: 'pending' as const },
+        { id: 'write_verify', translationKey: 'writeVerifying', status: 'pending' as const },
       ];
 
   const overallStatus = isReady

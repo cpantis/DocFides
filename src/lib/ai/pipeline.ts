@@ -1,20 +1,28 @@
+/**
+ * AI Pipeline Orchestrator — 3-stage pipeline.
+ *
+ * Stage 1: parser         — Parse documents (OCR, text extraction, table detection)
+ * Stage 2: extract_analyze — Extract data + analyze style + map to template fields
+ * Stage 3: write_verify    — Generate text + verify quality
+ *
+ * Each stage output is persisted to MongoDB so stages can be re-run independently.
+ */
+
 import { PIPELINE_STAGES_ORDER, type PipelineStage } from '@/types/pipeline';
-import { runExtractorAgent } from './extractor-agent';
-import { runModelAgent } from './model-agent';
-import { runTemplateAgent } from './template-agent';
-import { runMappingAgent } from './mapping-agent';
-import { runWritingAgent } from './writing-agent';
-import { runVerificationAgent } from './verification-agent';
+import { runExtractAnalyzeAgent } from './extract-analyze-agent';
+import { runWriteVerifyAgent } from './write-verify-agent';
 import type { AgentResult } from './client';
 
 export interface PipelineContext {
   projectId: string;
   userId: string;
   hasModelDocument: boolean;
+  /** Agent 1 output: extracted data, style guide, field map */
   projectData?: Record<string, unknown>;
   modelMap?: Record<string, unknown>;
   templateSchema?: Record<string, unknown>;
   draftPlan?: Record<string, unknown>;
+  /** Agent 2 output: field completions + quality report */
   fieldCompletions?: Record<string, unknown>;
   qualityReport?: Record<string, unknown>;
 }
@@ -32,7 +40,7 @@ export interface StageResult {
 /**
  * Run the AI pipeline for a project.
  * If `singleStage` is provided, runs only that stage.
- * Otherwise runs all stages in order.
+ * Otherwise runs all 3 stages in order.
  */
 export async function runPipeline(
   projectId: string,
@@ -42,18 +50,11 @@ export async function runPipeline(
 
   const stages = singleStage
     ? [singleStage]
-    : PIPELINE_STAGES_ORDER.filter(
-        (stage) => stage !== 'model' || context.hasModelDocument
-      );
+    : PIPELINE_STAGES_ORDER;
 
   const results: StageResult[] = [];
 
   for (const stage of stages) {
-    if (stage === 'model' && !context.hasModelDocument) {
-      console.log(`[Pipeline] Skipping model stage — no model document`);
-      continue;
-    }
-
     const startTime = Date.now();
     console.log(`[Pipeline] Running stage: ${stage}`);
 
@@ -67,26 +68,35 @@ export async function runPipeline(
       };
       results.push(stageResult);
 
-      // Update context for downstream agents
+      // Update context for downstream stages
       switch (stage) {
-        case 'extractor':
-          context.projectData = result.output;
+        case 'parser':
+          // Parser doesn't produce AI context — it creates Extraction records
           break;
-        case 'model':
-          context.modelMap = result.output;
+        case 'extract_analyze': {
+          // Agent 1 outputs a combined JSON — split into legacy fields for compatibility
+          const output = result.output;
+          context.projectData = output.project_data as Record<string, unknown>;
+          context.modelMap = output.style_guide as Record<string, unknown>;
+          context.templateSchema = output.field_map as Record<string, unknown>;
+          context.draftPlan = output.field_map as Record<string, unknown>;
           break;
-        case 'template':
-          context.templateSchema = result.output;
+        }
+        case 'write_verify': {
+          // Agent 2 outputs field completions + quality report combined
+          const output = result.output;
+          context.fieldCompletions = {
+            fields: output.fields,
+            qualityScores: output.quality_scores,
+          };
+          context.qualityReport = {
+            global_score: output.global_score,
+            errors: output.errors,
+            warnings: output.warnings,
+            data_leakage_check: output.data_leakage_check,
+          };
           break;
-        case 'mapping':
-          context.draftPlan = result.output;
-          break;
-        case 'writing':
-          context.fieldCompletions = result.output;
-          break;
-        case 'verification':
-          context.qualityReport = result.output;
-          break;
+        }
       }
 
       // Persist stage output to project in MongoDB
@@ -128,6 +138,10 @@ async function buildContextFromProject(projectId: string): Promise<PipelineConte
   };
 }
 
+/**
+ * Persist stage output to the Project document in MongoDB.
+ * Maps new 3-stage outputs to existing project fields for backward compatibility.
+ */
 async function saveStageOutput(
   projectId: string,
   stage: PipelineStage,
@@ -136,28 +150,31 @@ async function saveStageOutput(
   const { connectToDatabase, Project } = await import('@/lib/db');
   await connectToDatabase();
 
-  const update: Record<string, Record<string, unknown>> = {};
+  const update: Record<string, unknown> = {};
+
   switch (stage) {
     case 'parser':
-      // Parser stage output is a summary — no project-level field to persist
+      // Parser creates Extraction records — no project-level field
       break;
-    case 'extractor':
-      update['projectData'] = output;
+    case 'extract_analyze':
+      // Split Agent 1 output into legacy project fields
+      update['projectData'] = output.project_data;
+      update['modelMap'] = output.style_guide;
+      update['templateSchema'] = output.field_map;
+      update['draftPlan'] = output.field_map;
       break;
-    case 'model':
-      update['modelMap'] = output;
-      break;
-    case 'template':
-      update['templateSchema'] = output;
-      break;
-    case 'mapping':
-      update['draftPlan'] = output;
-      break;
-    case 'writing':
-      update['fieldCompletions'] = output;
-      break;
-    case 'verification':
-      update['qualityReport'] = output;
+    case 'write_verify':
+      // Split Agent 2 output into legacy project fields
+      update['fieldCompletions'] = {
+        fields: output.fields,
+        qualityScores: output.quality_scores,
+      };
+      update['qualityReport'] = {
+        global_score: output.global_score,
+        errors: output.errors,
+        warnings: output.warnings,
+        data_leakage_check: output.data_leakage_check,
+      };
       break;
   }
 
@@ -168,7 +185,6 @@ async function saveStageOutput(
 
 /**
  * Fetch raw text from Extraction collection for a set of documents.
- * Combines rawText from each extraction, prefixed with filename.
  */
 async function getDocumentTexts(
   projectId: string,
@@ -211,7 +227,6 @@ async function getDocumentTexts(
         tagName,
       });
     } else if (extraction?.blocks && extraction.blocks.length > 0) {
-      // Fallback: concatenate text from blocks
       const text = extraction.blocks
         .map((b) => (b as Record<string, unknown>).text ?? '')
         .filter(Boolean)
@@ -231,26 +246,18 @@ async function getDocumentTexts(
 }
 
 /**
- * Run the Parser Agent stage.
- *
- * For each document not yet extracted, downloads the file and parses it
- * using Claude AI Vision (PDFs, images) or Node.js extractors (DOCX, XLSX).
- * Creates Extraction records in MongoDB so downstream agents can read the text.
- *
- * Returns a summary of parsed documents as the stage output.
+ * Run the Parser stage — parse all unparsed documents.
  */
 async function runParserStage(projectId: string): Promise<AgentResult> {
   const { connectToDatabase, DocumentModel, Extraction } = await import('@/lib/db');
   await connectToDatabase();
 
-  // Find all documents that need parsing (status !== 'extracted' and !== 'deleted')
   const docs = await DocumentModel.find({
     projectId,
     status: { $in: ['uploaded', 'processing', 'failed'] },
   });
 
   if (docs.length === 0) {
-    // All documents already extracted — return summary of existing extractions
     const extractedDocs = await DocumentModel.find({ projectId, status: 'extracted' });
     return {
       output: {
@@ -276,11 +283,9 @@ async function runParserStage(projectId: string): Promise<AgentResult> {
     console.log(`[ParserAgent] Parsing ${doc.originalFilename} (${doc.role}, ${doc.mimeType})...`);
 
     try {
-      // Check if extraction already exists by SHA256 (cache)
       const cachedExtraction = await Extraction.findOne({ sha256: doc.sha256 });
       if (cachedExtraction) {
         console.log(`[ParserAgent] Cache hit for ${doc.originalFilename}`);
-        // Ensure extraction record linked to this documentId exists
         const existing = await Extraction.findOne({ documentId: docId });
         if (!existing) {
           await Extraction.create({
@@ -305,26 +310,19 @@ async function runParserStage(projectId: string): Promise<AgentResult> {
         continue;
       }
 
-      // Download file from /tmp storage
       await DocumentModel.findByIdAndUpdate(docId, { status: 'processing' });
-      const { readTempFile } = await import('@/lib/storage/tmp-storage');
-      const fileBuffer = await readTempFile(doc.storageKey);
+      const { readDocumentFileWithFallback } = await import('@/lib/storage/tmp-storage');
+      const fileBuffer = await readDocumentFileWithFallback(doc.storageKey, docId);
 
-      // Parse using the intelligent pipeline (AI Vision → Python → Node.js)
       const { parseDocument } = await import('@/lib/parsing/parse-pipeline');
       const { calculateOverallConfidence } = await import('@/lib/parsing/confidence');
 
       const parseResult = await parseDocument(fileBuffer, doc.originalFilename, doc.mimeType);
 
-      // Track token usage from AI Vision calls (embedded in processing time as proxy)
-      // The actual tokens are tracked inside ocr-agent.ts via callAgentWithRetry
-
-      // Evaluate confidence
       type BlockForConfidence = Parameters<typeof calculateOverallConfidence>[0][number];
       const blocksForConfidence = parseResult.blocks as BlockForConfidence[];
       const overall = calculateOverallConfidence(blocksForConfidence);
 
-      // Store extraction in MongoDB
       await Extraction.create({
         documentId: docId,
         sha256: doc.sha256,
@@ -337,7 +335,6 @@ async function runParserStage(projectId: string): Promise<AgentResult> {
         processingTimeMs: parseResult.processingTimeMs,
       });
 
-      // Mark document as extracted
       await DocumentModel.findByIdAndUpdate(docId, {
         status: 'extracted',
         extractionBlocks: parseResult.blocks,
@@ -376,7 +373,6 @@ async function runParserStage(projectId: string): Promise<AgentResult> {
   const parsed = results.filter((r) => r.status === 'extracted' || r.status === 'cached').length;
   const failed = results.filter((r) => r.status === 'failed').length;
 
-  // Verify at least source documents are available after parsing
   const extractedSources = await DocumentModel.countDocuments({
     projectId,
     role: 'source',
@@ -402,7 +398,7 @@ async function runParserStage(projectId: string): Promise<AgentResult> {
 }
 
 /**
- * Run a single pipeline stage, routing to the appropriate agent.
+ * Run a single pipeline stage.
  */
 async function runStage(
   stage: PipelineStage,
@@ -412,131 +408,49 @@ async function runStage(
     case 'parser':
       return runParserStage(context.projectId);
 
-    case 'extractor': {
+    case 'extract_analyze': {
       const sourceDocs = await getDocumentTexts(context.projectId, 'source');
       if (sourceDocs.length === 0) {
-        throw new Error('No extracted source documents found for extractor stage');
+        throw new Error('No extracted source documents found for extract_analyze stage');
       }
-      return runExtractorAgent({
-        documents: sourceDocs.map((d) => ({
-          filename: d.filename,
-          content: d.content,
-          role: 'source' as const,
-          tag: d.tagName,
-        })),
-      });
-    }
 
-    case 'model': {
-      const modelDocs = await getDocumentTexts(context.projectId, 'model');
-      if (modelDocs.length === 0) {
-        throw new Error('No extracted model documents found for model stage');
-      }
-      return runModelAgent({ documents: modelDocs });
-    }
+      const modelDocs = context.hasModelDocument
+        ? await getDocumentTexts(context.projectId, 'model')
+        : [];
 
-    case 'template': {
       const templateDocs = await getDocumentTexts(context.projectId, 'template');
       const templateDoc = templateDocs[0];
       if (!templateDoc) {
-        throw new Error('No extracted template document found for template stage');
+        throw new Error('No extracted template document found for extract_analyze stage');
       }
 
-      // Check if template is a PDF (needs special handling)
-      const { connectToDatabase: connectDb, DocumentModel: DocModel } = await import('@/lib/db');
-      await connectDb();
-      const templateDocRecord = await DocModel.findOne({
-        projectId: context.projectId,
-        role: 'template',
-        status: 'extracted',
-      });
-
-      const isPdf = templateDocRecord?.mimeType === 'application/pdf';
-
-      if (isPdf && templateDocRecord) {
-        // Analyze PDF template: detect AcroForm fields, determine type
-        const { analyzePdfTemplate } = await import('@/lib/docgen/pdf-template-detector');
-
-        const { readDocumentFileWithFallback } = await import('@/lib/storage/tmp-storage');
-        const templateBuffer = await readDocumentFileWithFallback(
-          templateDocRecord.storageKey,
-          String(templateDocRecord._id)
-        );
-
-        const pdfAnalysis = await analyzePdfTemplate(templateBuffer);
-
-        console.log(
-          `[Pipeline] PDF template detected: ${pdfAnalysis.type}, ${pdfAnalysis.fields.length} form fields`
-        );
-
-        if (pdfAnalysis.type === 'acroform') {
-          return runTemplateAgent({
-            content: templateDoc.content,
-            templateType: 'acroform',
-            pdfFormFields: pdfAnalysis.fields,
-          });
-        } else {
-          // Flat PDF — render pages as images for Claude Vision analysis
-          const { renderPdfPagesAsImages } = await import('@/lib/docgen/pdf-page-renderer');
-          const pageImages = await renderPdfPagesAsImages(templateBuffer, pdfAnalysis.pageCount);
-          return runTemplateAgent({
-            content: templateDoc.content,
-            templateType: 'flat_pdf',
-            pageImages,
-          });
-        }
-      }
-
-      // Default: DOCX template
-      return runTemplateAgent(templateDoc.content);
-    }
-
-    case 'mapping': {
-      if (!context.projectData) {
-        throw new Error('Missing projectData for mapping stage — run extractor first');
-      }
-      if (!context.templateSchema) {
-        throw new Error('Missing templateSchema for mapping stage — run template first');
-      }
-      // Fetch tag assignments for source documents to pass to mapping agent
-      const sourceDocsForMapping = await getDocumentTexts(context.projectId, 'source');
-      const documentTags = sourceDocsForMapping
-        .filter((d) => d.tagName)
-        .map((d) => ({ filename: d.filename, tag: d.tagName! }));
-
-      return runMappingAgent({
-        projectData: context.projectData,
-        modelMap: context.modelMap,
-        templateSchema: context.templateSchema,
-        documentTags: documentTags.length > 0 ? documentTags : undefined,
+      return runExtractAnalyzeAgent({
+        sourceDocs: sourceDocs.map((d) => ({
+          filename: d.filename,
+          content: d.content,
+          tag: d.tagName,
+        })),
+        modelDocs: modelDocs.length > 0
+          ? modelDocs.map((d) => ({ filename: d.filename, content: d.content }))
+          : undefined,
+        templateDoc: {
+          filename: templateDoc.filename,
+          content: templateDoc.content,
+        },
       });
     }
 
-    case 'writing': {
+    case 'write_verify': {
       if (!context.projectData) {
-        throw new Error('Missing projectData for writing stage — run extractor first');
+        throw new Error('Missing projectData for write_verify stage — run extract_analyze first');
       }
       if (!context.draftPlan) {
-        throw new Error('Missing draftPlan for writing stage — run mapping first');
+        throw new Error('Missing field map for write_verify stage — run extract_analyze first');
       }
-      return runWritingAgent({
+      return runWriteVerifyAgent({
         projectData: context.projectData,
-        modelMap: context.modelMap,
-        draftPlan: context.draftPlan,
-      });
-    }
-
-    case 'verification': {
-      if (!context.projectData) {
-        throw new Error('Missing projectData for verification stage — run extractor first');
-      }
-      if (!context.fieldCompletions) {
-        throw new Error('Missing fieldCompletions for verification stage — run writing first');
-      }
-      return runVerificationAgent({
-        projectData: context.projectData,
-        modelMap: context.modelMap,
-        fieldCompletions: context.fieldCompletions,
+        styleGuide: context.modelMap ?? {},
+        fieldMap: context.draftPlan,
       });
     }
 
