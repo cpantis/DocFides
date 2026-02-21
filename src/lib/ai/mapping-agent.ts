@@ -6,11 +6,16 @@ export interface MappingInput {
   projectData: Record<string, unknown>;
   modelMap?: Record<string, unknown>;
   templateSchema: Record<string, unknown>;
+  documentTags?: { filename: string; tag: string }[];
 }
 
 export async function runMappingAgent(input: MappingInput): Promise<AgentResult> {
   const modelMapSection = input.modelMap
     ? `\n\nModel Map (STYLE ONLY — no factual data):\n${JSON.stringify(input.modelMap, null, 2)}`
+    : '';
+
+  const tagSection = input.documentTags && input.documentTags.length > 0
+    ? `\n\nDocument Tags (user-assigned entity roles for source documents):\n${input.documentTags.map((dt) => `- ${dt.filename} → ${dt.tag}`).join('\n')}\n\nUse these tags to resolve entity ambiguity. When a field refers to a role (e.g., "beneficiary"), prefer data from documents tagged with that role.`
     : '';
 
   return callAgentWithRetry(
@@ -77,7 +82,7 @@ export async function runMappingAgent(input: MappingInput): Promise<AgentResult>
       messages: [
         {
           role: 'user',
-          content: `Map the extracted project data to the template fields. For each field, specify the data source (dot-notation path), mapping type, and strategy. Flag ambiguous entity fields.\n\nProject Data:\n${JSON.stringify(input.projectData, null, 2)}\n\nTemplate Schema:\n${JSON.stringify(input.templateSchema, null, 2)}${modelMapSection}`,
+          content: `Map the extracted project data to the template fields. For each field, specify the data source (dot-notation path), mapping type, and strategy. Use document tags to resolve entity ambiguity when possible. Flag ambiguous entity fields only when tags don't resolve them.\n\nProject Data:\n${JSON.stringify(input.projectData, null, 2)}\n\nTemplate Schema:\n${JSON.stringify(input.templateSchema, null, 2)}${modelMapSection}${tagSection}`,
         },
       ],
     },

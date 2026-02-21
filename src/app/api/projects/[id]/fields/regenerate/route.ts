@@ -1,21 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
-import { connectToDatabase, Project, User, Generation, Audit } from '@/lib/db';
+import { connectToDatabase, Project, Generation, Audit } from '@/lib/db';
 import { callAgentWithRetry } from '@/lib/ai/client';
 import { AGENT_MODELS } from '@/types/pipeline';
-import { WRITING_SYSTEM_PROMPT } from '@/lib/ai/prompts/writing';
+import { WRITE_VERIFY_SYSTEM_PROMPT } from '@/lib/ai/prompts/write-verify';
 
 const regenerateSchema = z.object({
   fieldId: z.string().min(1),
 });
 
-const REGENERATION_CREDIT_COST = 0.5;
-
 /**
  * POST /api/projects/[id]/fields/regenerate
  * Regenerate a single field using the Writing Agent.
- * Costs 0.5 credits.
  */
 export async function POST(
   req: NextRequest,
@@ -30,22 +27,10 @@ export async function POST(
 
     await connectToDatabase();
 
-    const [project, user] = await Promise.all([
-      Project.findOne({ _id: id, userId }),
-      User.findOne({ clerkId: userId }),
-    ]);
+    const project = await Project.findOne({ _id: id, userId });
 
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-    }
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
-
-    // Check credits
-    if (user.credits.used + REGENERATION_CREDIT_COST > user.credits.total) {
-      return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
     }
 
     const projectData = (project.projectData ?? {}) as Record<string, unknown>;
@@ -72,9 +57,9 @@ export async function POST(
     // Call Writing Agent for single field regeneration
     const result = await callAgentWithRetry(
       {
-        model: AGENT_MODELS.writing,
+        model: AGENT_MODELS.write_verify,
         max_tokens: 4096,
-        system: WRITING_SYSTEM_PROMPT,
+        system: WRITE_VERIFY_SYSTEM_PROMPT,
         tools: [
           {
             name: 'save_field_completion',
@@ -107,7 +92,9 @@ Generate a fresh, accurate value for this field. Follow Romanian formatting conv
           },
         ],
       },
-      'save_field_completion'
+      'save_field_completion',
+      'FieldRegenerate',
+      id
     );
 
     const newValue = (result.output.value as string) ?? '';
@@ -121,16 +108,12 @@ Generate a fresh, accurate value for this field. Follow Romanian formatting conv
       $set: { fieldCompletions: { ...currentCompletions, fields } },
     });
 
-    // Deduct credits
-    user.credits.used += REGENERATION_CREDIT_COST;
-    await user.save();
-
     // Record generation
     await Generation.create({
       projectId: id,
       userId,
       type: 'regeneration',
-      creditsUsed: REGENERATION_CREDIT_COST,
+      creditsUsed: 0,
       tokenUsage: {
         inputTokens: result.tokenUsage.inputTokens,
         outputTokens: result.tokenUsage.outputTokens,

@@ -1,12 +1,6 @@
-import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 
 export default async function AdminPage() {
-  const { userId } = await auth();
-  if (!userId) redirect('/sign-in');
-  // TODO: Check admin role
-
   return <AdminContent />;
 }
 

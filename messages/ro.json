@@ -48,7 +48,7 @@
         },
         "process": {
           "title": "AI procesează",
-          "description": "6 agenți AI extrag, mapează și scriu"
+          "description": "AI-ul extrage, mapează și scrie automat"
         },
         "review": {
           "title": "Revizuiește și editează",
@@ -65,8 +65,8 @@
       "subtitle": "Tot ce ai nevoie pentru documentație profesională",
       "items": {
         "aiPipeline": {
-          "title": "Pipeline AI cu 6 agenți",
-          "description": "Extrage, analizează, mapează, scrie, verifică — fiecare pas gestionat de un agent AI specializat"
+          "title": "Pipeline AI",
+          "description": "Extrage, analizează, mapează, scrie, verifică — totul gestionat de agenți AI optimizați"
         },
         "ocr": {
           "title": "OCR avansat",
@@ -194,6 +194,7 @@
   "dashboard": {
     "title": "Panou de control",
     "newProject": "Proiect nou",
+    "projectsHeading": "Proiecte",
     "noProjects": "Nu ai încă niciun proiect. Creează primul!",
     "credits": {
       "title": "Credite",
@@ -206,6 +207,17 @@
       "costPerDoc": "Cost mediu/document",
       "timeSaved": "Ore economisite",
       "recentActivity": "Activitate recentă"
+    },
+    "tags": {
+      "title": "Etichete documente",
+      "description": "Gestionează etichetele pentru a categoriza documentele sursă pe rol de entitate. Etichetele ajută pipeline-ul AI să asocieze datele cu entitățile corecte.",
+      "addTag": "Adaugă etichetă",
+      "noTags": "Nu ai încă etichete. Adaugă prima etichetă pentru a categoriza documentele.",
+      "namePlaceholder": "Numele etichetei...",
+      "manageTags": "Gestionează etichete",
+      "selectTag": "Selectează etichetă",
+      "removeTag": "Șterge etichetă",
+      "addLabel": "+ Etichetă"
     }
   },
   "project": {
@@ -228,19 +240,38 @@
       "templateHint": "Șablonul de document de completat",
       "modelLabel": "Document model (opțional)",
       "modelHint": "Referință de stil doar — nu se vor extrage date factuale",
+      "uploadHint": "Trage și plasează fișierele sau click pentru a le selecta de pe calculatorul tău. Fiecare categorie are zona sa de încărcare.",
       "filenameHint": "Sfat: Numește fișierele descriptiv (ex: CI_beneficiar_Popescu.pdf)",
+      "privacyTitle": "Documentele tale sunt în siguranță",
+      "privacyDescription": "Fișierele sunt procesate temporar pentru extragerea datelor, apoi șterse automat. Doar datele structurate extrase sunt păstrate pentru procesarea AI. Documentele originale nu sunt stocate permanent.",
+      "uploaded": "încărcate",
+      "startProcessing": "Începe procesarea",
       "maxFiles": "Maximum {max} fișiere",
       "maxSize": "Maximum {max}MB per fișier",
-      "acceptedFormats": "Acceptate: PDF, DOCX, XLSX, XLS, PNG, JPG, TIFF"
+      "acceptedFormats": "Acceptate: PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, PNG, TIFF",
+      "dropFiles": "Trage fișierele aici sau click pentru a selecta",
+      "remaining": "rămase",
+      "errors": {
+        "fileEmpty": "Fișierul este gol (0 bytes)",
+        "fileTooLarge": "Prea mare ({size}MB) — max {max}MB",
+        "noExtension": "Fișierul nu are extensie — formatul nu poate fi determinat",
+        "unsupportedFormat": "Format nesuportat ({ext})",
+        "mimeTypeSuspicious": "Tip fișier nepotrivit — se aștepta {expected}, primit {declared}",
+        "filenameTooLong": "Numele fișierului e prea lung ({length} caractere, max {max})",
+        "filenameInvalidChars": "Numele fișierului conține caractere invalide",
+        "duplicateFile": "Un fișier cu acest nume este deja selectat",
+        "maxSourceFiles": "Limita de fișiere sursă atinsă (max {max})",
+        "maxModelFiles": "Limita de fișiere model atinsă (max {max})",
+        "maxTemplateFiles": "Este permis un singur fișier șablon",
+        "fileReadError": "Fișierul nu a putut fi citit"
+      }
     },
     "processing": {
       "title": "Procesare AI",
       "steps": {
-        "extracting": "Se extrag datele din documente...",
-        "analyzing": "Se analizează stilul din documentul model...",
-        "mapping": "Se mapează datele pe câmpurile șablonului...",
-        "writing": "Se generează textul...",
-        "verifying": "Se verifică calitatea..."
+        "parsing": "Se citesc documentele (OCR, text, tabele)...",
+        "extractAnalyzing": "Se extrag datele, se analizează stilul, se mapează câmpurile...",
+        "writeVerifying": "Se generează textul și se verifică calitatea..."
       },
       "complete": "Procesare completă!",
       "failed": "Procesarea a eșuat. Reîncearcă.",
@@ -248,6 +279,9 @@
     },
     "editor": {
       "title": "Revizuiește și editează",
+      "pipelineNotReady": "Pipeline-ul AI nu s-a finalizat încă. Rulează mai întâi procesarea.",
+      "viewProcessing": "Vezi statusul procesării",
+      "goToUpload": "Mergi la încărcare",
       "field": "Câmp {number}",
       "accept": "Acceptă",
       "edit": "Editează",
@@ -262,7 +296,23 @@
       "confidenceMedium": "Încredere medie — revizuire recomandată",
       "confidenceLow": "Încredere scăzută — revizuire manuală necesară",
       "multipleSuggestions": "Entități multiple detectate — alege:",
-      "entitySource": "Sursă: {filename}"
+      "entitySource": "Sursă: {filename}",
+      "viewDocument": "Documente sursă",
+      "viewTemplate": "Șablon",
+      "templatePreviewSubtitle": "Șablon cu {count} câmpuri de completat",
+      "noFields": "Nu s-au detectat câmpuri în șablon",
+      "detectedFields": "{count} câmpuri detectate",
+      "noTemplateText": "Textul șablonului nu este disponibil",
+      "loadingTemplate": "Se încarcă șablonul...",
+      "sourceDocCount": "{count} document(e) sursă",
+      "noSourceDocs": "Nu există documente sursă",
+      "loadingDocs": "Se încarcă documentele...",
+      "paragraphs": "paragrafe",
+      "fieldStatus": "Status câmpuri",
+      "tableAddRow": "Adaugă rând",
+      "tableRemoveRow": "Șterge rând",
+      "tableAddColumn": "Adaugă coloană",
+      "tableRemoveColumn": "Șterge coloană"
     },
     "export": {
       "title": "Exportă documentul",
@@ -270,7 +320,8 @@
       "pdf": "Exportă PDF",
       "credits": "Aceasta va folosi {credits} credit(e)",
       "downloading": "Se pregătește descărcarea...",
-      "success": "Document exportat cu succes!"
+      "success": "Document exportat cu succes!",
+      "exportFailed": "Exportul a eșuat"
     }
   },
   "admin": {

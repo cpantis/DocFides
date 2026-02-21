@@ -3,7 +3,7 @@
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { motion } from 'framer-motion';
-import { CheckCircle, FileText, FileSpreadsheet, Image } from 'lucide-react';
+import { CheckCircle, FileText, FileSpreadsheet, Image as ImageIcon } from 'lucide-react';
 
 export function Hero() {
   const t = useTranslations('landing.hero');
@@ -108,7 +108,7 @@ export function Hero() {
               transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
               className="absolute bottom-12 -left-8 z-10 rounded-xl border border-gray-200 bg-white p-4 shadow-lg"
             >
-              <Image className="h-8 w-8 text-accent-500" />
+              <ImageIcon className="h-8 w-8 text-accent-500" />
               <div className="mt-2 h-2 w-12 rounded bg-gray-200" />
               <div className="mt-1 h-2 w-8 rounded bg-gray-100" />
             </motion.div>

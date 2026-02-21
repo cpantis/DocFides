@@ -10,8 +10,6 @@ import { LocaleSwitcher } from './LocaleSwitcher';
 const navLinks = [
   { href: '#how-it-works', key: 'howItWorks' },
   { href: '#features', key: 'features' },
-  { href: '#pricing', key: 'pricing' },
-  { href: '#faq', key: 'faq' },
 ] as const;
 
 export function Navbar() {

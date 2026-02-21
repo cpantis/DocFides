@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
-import { Plus, LayoutDashboard } from 'lucide-react';
+import { Plus, LayoutDashboard, AlertCircle } from 'lucide-react';
 import { useProjects } from '@/lib/hooks/use-projects';
 import { useUserStats } from '@/lib/hooks/use-user-stats';
 import { ProjectCard } from '@/components/project/ProjectCard';
@@ -11,15 +11,24 @@ import { UsageChart } from './UsageChart';
 import { TimeSavedBadge } from './TimeSavedBadge';
 import { RecentActivity } from './RecentActivity';
 import { AlertBanner } from './AlertBanner';
+import { TagManager } from './TagManager';
 
 export function DashboardContent() {
   const t = useTranslations('dashboard');
-  const { projects, isLoading, mutate } = useProjects();
-  const { stats } = useUserStats();
+  const tc = useTranslations('common');
+  const { projects, isLoading, isError, mutate } = useProjects();
+  const { stats, isError: statsError } = useUserStats();
 
   const handleDelete = async (id: string) => {
-    await fetch(`/api/projects/${id}`, { method: 'DELETE' });
-    mutate();
+    try {
+      const res = await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        console.error(`[Dashboard] Delete failed for project ${id}: ${res.status}`);
+      }
+      mutate();
+    } catch (error) {
+      console.error('[Dashboard] Delete request failed:', error);
+    }
   };
 
   return (
@@ -44,6 +53,20 @@ export function DashboardContent() {
       </header>
 
       <div className="mx-auto max-w-7xl px-6 py-8">
+        {/* Connection error */}
+        {(isError || statsError) && (
+          <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <AlertCircle className="h-4 w-4 shrink-0" />
+            <span>{tc('error')}</span>
+            <button
+              onClick={() => mutate()}
+              className="ml-auto text-xs font-medium underline hover:no-underline"
+            >
+              {tc('retry')}
+            </button>
+          </div>
+        )}
+
         {/* Credit alerts */}
         {stats && <AlertBanner creditPercent={stats.credits.percentUsed} />}
 
@@ -58,10 +81,21 @@ export function DashboardContent() {
           <RecentActivity items={stats?.recentActivity ?? []} />
         </div>
 
+        {/* Document tags */}
+        <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h2 className="font-heading text-lg font-semibold text-gray-900">
+            {t('tags.title')}
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">{t('tags.description')}</p>
+          <div className="mt-4">
+            <TagManager />
+          </div>
+        </div>
+
         {/* Projects list */}
         <div className="mt-10">
           <h2 className="font-heading text-lg font-semibold text-gray-900">
-            Projects
+            {t('projectsHeading')}
           </h2>
 
           {isLoading ? (
@@ -92,6 +126,7 @@ export function DashboardContent() {
                   status={project.status}
                   sourceCount={project.sourceDocuments.length}
                   updatedAt={project.updatedAt}
+                  aiCost={project.aiCost}
                   onDelete={handleDelete}
                 />
               ))}

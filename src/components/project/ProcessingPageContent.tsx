@@ -1,59 +1,119 @@
 'use client';
 
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useProject } from '@/lib/hooks/use-projects';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { ProcessingProgress } from './ProcessingProgress';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/utils/fetcher';
 
 interface ProcessingPageContentProps {
   projectId: string;
 }
 
-const PIPELINE_STAGES = [
-  { id: 'extraction', translationKey: 'extracting' },
-  { id: 'model_analysis', translationKey: 'analyzing' },
-  { id: 'mapping', translationKey: 'mapping' },
-  { id: 'writing', translationKey: 'writing' },
-  { id: 'verification', translationKey: 'verifying' },
-] as const;
+interface StageProgress {
+  stage: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  startedAt?: string;
+  completedAt?: string;
+  error?: string;
+}
+
+interface PipelineStatusResponse {
+  data: {
+    status: string;
+    currentStage: string | null;
+    stages: StageProgress[];
+  };
+}
+
+const STAGE_TRANSLATION_MAP: Record<string, string> = {
+  parser: 'parsing',
+  extract_analyze: 'extractAnalyzing',
+  write_verify: 'writeVerifying',
+};
 
 export function ProcessingPageContent({ projectId }: ProcessingPageContentProps) {
   const t = useTranslations('project');
   const { project, isLoading } = useProject(projectId);
+  const [pipelineStarted, setPipelineStarted] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const triggerRef = useRef(false);
 
-  if (isLoading) {
+  // Poll pipeline status every 2 seconds once pipeline is started
+  const { data: statusData } = useSWR<PipelineStatusResponse>(
+    pipelineStarted ? `/api/pipeline/${projectId}/status` : null,
+    fetcher,
+    { refreshInterval: 2000 }
+  );
+
+  const projectStatus = statusData?.data?.status;
+  const stagesFromAPI = statusData?.data?.stages ?? [];
+  const isReady = projectStatus === 'ready' || projectStatus === 'exported';
+  const hasFailedStage = stagesFromAPI.some((s) => s.status === 'failed');
+  // Detect silent failure: project reverted to 'draft' without completing
+  const isSilentFailure = projectStatus === 'draft' && stagesFromAPI.length > 0 && !isReady;
+  const isFailed = hasFailedStage || isSilentFailure;
+
+  // Trigger pipeline on mount
+  const startPipeline = useCallback(async () => {
+    if (triggerRef.current) return;
+    triggerRef.current = true;
+
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId }),
+      });
+
+      if (res.ok || res.status === 409) {
+        // 409 = already running, that's fine
+        setPipelineStarted(true);
+      } else {
+        const data = await res.json();
+        setStartError(data.error || 'Failed to start pipeline');
+        setPipelineStarted(true);
+      }
+    } catch {
+      setStartError('Failed to connect to server');
+      setPipelineStarted(true);
+    }
+  }, [projectId]);
+
+  useEffect(() => {
+    startPipeline();
+  }, [startPipeline]);
+
+  // Build stage display from API response
+  const stages = stagesFromAPI.length > 0
+    ? stagesFromAPI.map((s) => ({
+        id: s.stage,
+        translationKey: STAGE_TRANSLATION_MAP[s.stage] ?? s.stage,
+        status: s.status === 'queued' ? ('pending' as const) : s.status,
+        error: s.error,
+      }))
+    : [
+        { id: 'parser', translationKey: 'parsing', status: 'pending' as const },
+        { id: 'extract_analyze', translationKey: 'extractAnalyzing', status: 'pending' as const },
+        { id: 'write_verify', translationKey: 'writeVerifying', status: 'pending' as const },
+      ];
+
+  const overallStatus = isReady
+    ? 'completed'
+    : isFailed
+    ? 'failed'
+    : 'processing';
+
+  if (isLoading || !pipelineStarted) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
       </div>
     );
   }
-
-  if (!project) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50">
-        <p className="text-gray-500">Project not found</p>
-        <Link href="/dashboard" className="mt-4 text-sm text-primary-600 hover:underline">
-          Back to dashboard
-        </Link>
-      </div>
-    );
-  }
-
-  const isProcessing = project.status === 'processing';
-  const isReady = project.status === 'ready' || project.status === 'exported';
-
-  const stages = PIPELINE_STAGES.map((stage) => ({
-    ...stage,
-    status: isReady
-      ? ('completed' as const)
-      : isProcessing
-      ? ('pending' as const)
-      : ('pending' as const),
-  }));
-
-  const overallStatus = isReady ? 'completed' : isProcessing ? 'processing' : 'processing';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -64,7 +124,7 @@ export function ProcessingPageContent({ projectId }: ProcessingPageContentProps)
             className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700"
           >
             <ArrowLeft className="h-4 w-4" />
-            {project.name}
+            {project?.name ?? 'Project'}
           </Link>
           <h1 className="mt-3 font-heading text-2xl font-bold text-gray-900">
             {t('processing.title')}
@@ -73,7 +133,21 @@ export function ProcessingPageContent({ projectId }: ProcessingPageContentProps)
       </header>
 
       <div className="mx-auto max-w-4xl px-6 py-8">
-        <ProcessingProgress stages={stages} overallStatus={overallStatus} />
+        {startError && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm text-amber-700">{startError}</p>
+          </div>
+        )}
+
+        <ProcessingProgress
+          stages={stages}
+          overallStatus={overallStatus}
+          onRetry={() => {
+            triggerRef.current = false;
+            setStartError(null);
+            startPipeline();
+          }}
+        />
 
         {isReady && (
           <div className="mt-6 flex justify-end">

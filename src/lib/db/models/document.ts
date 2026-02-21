@@ -11,12 +11,15 @@ export interface IDocument extends Document {
   format: string;
   sizeBytes: number;
   sha256: string;
-  r2Key: string;
+  storageKey: string;
   status: DocumentStatus;
   mimeType: string;
   pageCount?: number;
   extractionBlocks?: Record<string, unknown>[];
+  tagId?: string;
   parsingErrors?: string[];
+  /** Raw file bytes — stored only for template documents so export survives container restarts. */
+  fileData?: Buffer;
   deleteAt?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -31,7 +34,7 @@ const DocumentSchema = new Schema<IDocument>(
     format: { type: String, required: true },
     sizeBytes: { type: Number, required: true },
     sha256: { type: String, required: true, index: true },
-    r2Key: { type: String, required: true },
+    storageKey: { type: String, required: true },
     status: {
       type: String,
       enum: ['uploaded', 'processing', 'extracted', 'failed', 'deleted'],
@@ -40,7 +43,9 @@ const DocumentSchema = new Schema<IDocument>(
     mimeType: { type: String, required: true },
     pageCount: { type: Number },
     extractionBlocks: [{ type: Schema.Types.Mixed }],
+    tagId: { type: String },
     parsingErrors: [{ type: String }],
+    fileData: { type: Buffer, select: false },
     deleteAt: { type: Date, index: { expireAfterSeconds: 0 } },
   },
   { timestamps: true }

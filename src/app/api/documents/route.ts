@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
 import { connectToDatabase, DocumentModel, Project } from '@/lib/db';
-import { uploadDocumentSchema, validateFileSize, validateMimeType, MAX_SOURCE_FILES, MAX_MODEL_FILES } from '@/lib/utils/validation';
+import {
+  uploadDocumentSchema,
+  validateFileSize,
+  validateMimeType,
+  resolveMimeType,
+  MAX_SOURCE_FILES,
+  MAX_MODEL_FILES,
+} from '@/lib/utils/validation';
 import { hashFile } from '@/lib/utils/hash';
-import { uploadFile, generateR2Key } from '@/lib/storage/upload';
-import { getOcrQueue } from '@/lib/queue/queues';
+import { saveTempFile, generateStorageKey } from '@/lib/storage/tmp-storage';
+
+// Allow up to 25MB uploads in this Route Handler
+export const maxDuration = 60; // seconds
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,6 +25,7 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File | null;
     const projectId = formData.get('projectId') as string;
     const role = formData.get('role') as string;
+    const tagId = formData.get('tagId') as string | null;
 
     uploadDocumentSchema.parse({ projectId, role });
 
@@ -23,7 +33,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    if (!validateMimeType(file.type)) {
+    // Resolve MIME type from both declared type and extension (browsers may send generic types)
+    const mimeType = resolveMimeType(file.type, file.name);
+
+    if (!validateMimeType(mimeType)) {
       return NextResponse.json({ error: 'Unsupported file format' }, { status: 400 });
     }
 
@@ -58,11 +71,13 @@ export async function POST(req: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const sha256 = await hashFile(buffer);
-    const r2Key = generateR2Key(userId, projectId, file.name);
+    const storageKey = generateStorageKey(userId, projectId, file.name);
 
-    await uploadFile(r2Key, buffer, file.type);
+    // Save to /tmp for pipeline parser stage (may re-read if re-parsing needed)
+    await saveTempFile(storageKey, buffer);
 
     const format = file.name.split('.').pop()?.toLowerCase() ?? 'unknown';
+
     const doc = await DocumentModel.create({
       projectId,
       userId,
@@ -71,9 +86,13 @@ export async function POST(req: NextRequest) {
       format,
       sizeBytes: file.size,
       sha256,
-      r2Key,
-      mimeType: file.type,
+      storageKey,
+      mimeType,
+      status: 'uploaded',
       deleteAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24h TTL
+      ...(tagId && role === 'source' ? { tagId } : {}),
+      // Persist template bytes in MongoDB so export survives container restarts
+      ...(role === 'template' ? { fileData: buffer } : {}),
     });
 
     // Update project document references
@@ -83,31 +102,6 @@ export async function POST(req: NextRequest) {
       await Project.findByIdAndUpdate(projectId, { templateDocument: doc._id });
     } else if (role === 'model') {
       await Project.findByIdAndUpdate(projectId, { $push: { modelDocuments: doc._id } });
-    }
-
-    // Queue OCR/parsing job for source and template documents
-    if (role === 'source' || role === 'template') {
-      try {
-        const ocrQueue = getOcrQueue();
-        await ocrQueue.add(
-          `ocr-${doc._id}`,
-          {
-            documentId: String(doc._id),
-            projectId,
-            r2Key,
-            filename: file.name,
-            mimeType: file.type,
-            sha256,
-          },
-          {
-            attempts: 3,
-            backoff: { type: 'exponential', delay: 5000 },
-          }
-        );
-      } catch (queueError) {
-        // Queue failure shouldn't block upload — document is saved, OCR can be retried
-        console.error('[DOCUMENTS_POST] Failed to queue OCR job:', queueError);
-      }
     }
 
     return NextResponse.json({ data: doc }, { status: 201 });

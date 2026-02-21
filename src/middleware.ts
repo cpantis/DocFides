@@ -1,5 +1,4 @@
 import createIntlMiddleware from 'next-intl/middleware';
-import { clerkMiddleware } from '@clerk/nextjs/server';
 import { locales, defaultLocale } from '@/i18n/config';
 
 const intlMiddleware = createIntlMiddleware({
@@ -8,9 +7,9 @@ const intlMiddleware = createIntlMiddleware({
   localePrefix: 'as-needed',
 });
 
-export default clerkMiddleware((_auth, req) => {
+export default function middleware(req: Parameters<typeof intlMiddleware>[0]) {
   return intlMiddleware(req);
-});
+}
 
 export const config = {
   matcher: [

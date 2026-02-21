@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
+import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
 import { connectToDatabase, Project, Audit } from '@/lib/db';
-import { getPipelineQueue } from '@/lib/queue/queues';
+import { PIPELINE_STAGES_ORDER } from '@/types/pipeline';
+import { runPipelineBackground } from '@/lib/ai/pipeline-runner';
 
 const startPipelineSchema = z.object({
   projectId: z.string().min(1),
@@ -23,25 +24,53 @@ export async function POST(req: NextRequest) {
     }
 
     if (project.status === 'processing') {
-      return NextResponse.json({ error: 'Pipeline already running' }, { status: 409 });
+      // Check if pipeline is genuinely active (has a stage currently running)
+      const progress = (project.pipelineProgress ?? []) as Array<{ stage: string; status: string }>;
+      const hasRunningStage = progress.some((s) => s.status === 'running');
+      if (hasRunningStage) {
+        return NextResponse.json({ error: 'Pipeline already running' }, { status: 409 });
+      }
+      // Pipeline is stuck in 'processing' with no running stage — allow re-trigger
+      console.warn('[PIPELINE] Project stuck in processing without active stage — allowing re-trigger');
     }
 
-    // Queue pipeline job
-    const pipelineQueue = getPipelineQueue();
-    await pipelineQueue.add(
-      `pipeline-${body.projectId}`,
-      {
-        projectId: body.projectId,
-        userId,
-      },
-      {
-        attempts: 1, // Pipeline failures should not auto-retry (user retries manually)
-        jobId: `pipeline-${body.projectId}`, // Prevent duplicate jobs
-      }
-    );
+    // All 3 stages always run (model analysis is handled inside extract_analyze)
+    const stages = PIPELINE_STAGES_ORDER;
 
-    project.status = 'processing';
-    await project.save();
+    // Initialize pipelineProgress NOW so the frontend status polling
+    // immediately sees all stages as 'queued'.
+    const pipelineProgress = stages.map((stage) => ({
+      stage,
+      status: 'queued' as const,
+    }));
+    await Project.findByIdAndUpdate(body.projectId, {
+      $set: { pipelineProgress, status: 'processing' },
+    });
+
+    // Run pipeline inline (fire-and-forget — frontend polls /status for progress)
+    runPipelineBackground(body.projectId, userId).catch(async (error) => {
+      console.error('[PIPELINE_BACKGROUND]', error);
+      // If the background runner crashes before updating any stage,
+      // mark the first stage as failed so the user sees the error.
+      try {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const proj = await Project.findById(body.projectId).lean();
+        const progress = (proj?.pipelineProgress ?? []) as Array<{ stage: string; status: string }>;
+        const allQueued = progress.every((s) => s.status === 'queued');
+        if (allQueued && progress.length > 0) {
+          await Project.findByIdAndUpdate(body.projectId, {
+            $set: {
+              status: 'draft',
+              'pipelineProgress.0.status': 'failed',
+              'pipelineProgress.0.error': errorMsg,
+              'pipelineProgress.0.completedAt': new Date(),
+            },
+          });
+        }
+      } catch (dbErr) {
+        console.error('[PIPELINE_BACKGROUND] Failed to update error state:', dbErr);
+      }
+    });
 
     await Audit.create({
       userId,
@@ -50,12 +79,12 @@ export async function POST(req: NextRequest) {
       details: {},
     });
 
-    return NextResponse.json({ data: { status: 'queued', projectId: body.projectId } });
+    return NextResponse.json({ data: { status: 'started', projectId: body.projectId } });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 });
     }
     console.error('[PIPELINE_POST]', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: 'Internal server error' });
   }
 }

@@ -17,8 +17,10 @@ export const paginationSchema = z.object({
 export const ACCEPTED_MIME_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-excel',
+  'text/csv',
   'image/png',
   'image/jpeg',
   'image/tiff',
@@ -27,8 +29,10 @@ export const ACCEPTED_MIME_TYPES = [
 export const FILE_EXTENSION_MAP: Record<string, string> = {
   'application/pdf': 'pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/msword': 'doc',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
   'application/vnd.ms-excel': 'xls',
+  'text/csv': 'csv',
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/tiff': 'tiff',
@@ -42,8 +46,34 @@ export function validateFileSize(sizeBytes: number): boolean {
   return sizeBytes <= MAX_FILE_SIZE_BYTES;
 }
 
+/** Map file extensions to MIME types for fallback detection. */
+export const EXTENSION_TO_MIME: Record<string, string> = {
+  '.pdf': 'application/pdf',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.doc': 'application/msword',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.xls': 'application/vnd.ms-excel',
+  '.csv': 'text/csv',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.tiff': 'image/tiff',
+  '.tif': 'image/tiff',
+};
+
 export function validateMimeType(mimeType: string): boolean {
   return (ACCEPTED_MIME_TYPES as readonly string[]).includes(mimeType);
+}
+
+/**
+ * Resolve the correct MIME type from the file's declared MIME + filename extension.
+ * Browsers sometimes send generic types like application/octet-stream for .doc files.
+ */
+export function resolveMimeType(declaredMime: string, filename: string): string {
+  if (validateMimeType(declaredMime)) return declaredMime;
+  const ext = filename.toLowerCase().match(/\.[^.]+$/)?.[0];
+  if (ext && EXTENSION_TO_MIME[ext]) return EXTENSION_TO_MIME[ext];
+  return declaredMime;
 }
 
 // Romanian-specific validations

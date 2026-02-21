@@ -48,7 +48,7 @@
         },
         "process": {
           "title": "AI Processes",
-          "description": "6 AI agents extract, map, and write"
+          "description": "AI extracts, maps, and writes automatically"
         },
         "review": {
           "title": "Review & Edit",
@@ -65,8 +65,8 @@
       "subtitle": "Everything you need for professional documentation",
       "items": {
         "aiPipeline": {
-          "title": "6-Agent AI Pipeline",
-          "description": "Extract, analyze, map, write, verify — each step handled by a specialized AI agent"
+          "title": "AI Pipeline",
+          "description": "Extract, analyze, map, write, verify — all handled by optimized AI agents"
         },
         "ocr": {
           "title": "Advanced OCR",
@@ -194,6 +194,7 @@
   "dashboard": {
     "title": "Dashboard",
     "newProject": "New Project",
+    "projectsHeading": "Projects",
     "noProjects": "No projects yet. Create your first one!",
     "credits": {
       "title": "Credits",
@@ -206,6 +207,17 @@
       "costPerDoc": "Avg. cost/document",
       "timeSaved": "Hours saved",
       "recentActivity": "Recent Activity"
+    },
+    "tags": {
+      "title": "Document Tags",
+      "description": "Manage tags to categorize your source documents by entity role. Tags help the AI pipeline associate data with the correct entities.",
+      "addTag": "Add Tag",
+      "noTags": "No tags yet. Add your first tag to categorize documents.",
+      "namePlaceholder": "Tag name...",
+      "manageTags": "Manage Tags",
+      "selectTag": "Select tag",
+      "removeTag": "Remove tag",
+      "addLabel": "+ Tag"
     }
   },
   "project": {
@@ -228,19 +240,38 @@
       "templateHint": "The document template to fill",
       "modelLabel": "Model Document (Optional)",
       "modelHint": "Style reference only — no factual data will be extracted",
+      "uploadHint": "Drag and drop your files or click to browse from your computer. Each category has its own upload area.",
       "filenameHint": "Tip: Name files descriptively (e.g., CI_beneficiar_Popescu.pdf)",
+      "privacyTitle": "Your documents are safe",
+      "privacyDescription": "Files are processed temporarily to extract data, then automatically deleted. Only the extracted structured data is kept for AI processing. Original documents are never stored permanently.",
+      "uploaded": "uploaded",
+      "startProcessing": "Start Processing",
       "maxFiles": "Maximum {max} files",
       "maxSize": "Maximum {max}MB per file",
-      "acceptedFormats": "Accepted: PDF, DOCX, XLSX, XLS, PNG, JPG, TIFF"
+      "acceptedFormats": "Accepted: PDF, DOCX, DOC, XLSX, XLS, CSV, JPG, PNG, TIFF",
+      "dropFiles": "Drop files here or click to browse",
+      "remaining": "remaining",
+      "errors": {
+        "fileEmpty": "File is empty (0 bytes)",
+        "fileTooLarge": "Too large ({size}MB) — max {max}MB",
+        "noExtension": "No file extension — cannot determine format",
+        "unsupportedFormat": "Format not supported ({ext})",
+        "mimeTypeSuspicious": "File type mismatch — expected {expected}, got {declared}",
+        "filenameTooLong": "Filename too long ({length} chars, max {max})",
+        "filenameInvalidChars": "Filename contains invalid characters",
+        "duplicateFile": "A file with this name is already selected",
+        "maxSourceFiles": "Source file limit reached (max {max})",
+        "maxModelFiles": "Model file limit reached (max {max})",
+        "maxTemplateFiles": "Only one template file allowed",
+        "fileReadError": "Could not read this file"
+      }
     },
     "processing": {
       "title": "AI Processing",
       "steps": {
-        "extracting": "Extracting data from documents...",
-        "analyzing": "Analyzing style from model document...",
-        "mapping": "Mapping data to template fields...",
-        "writing": "Generating text...",
-        "verifying": "Verifying quality..."
+        "parsing": "Reading documents (OCR, text, tables)...",
+        "extractAnalyzing": "Extracting data, analyzing style, mapping fields...",
+        "writeVerifying": "Generating text and verifying quality..."
       },
       "complete": "Processing complete!",
       "failed": "Processing failed. Please retry.",
@@ -248,6 +279,9 @@
     },
     "editor": {
       "title": "Review & Edit",
+      "pipelineNotReady": "The AI pipeline hasn't completed yet. Please run processing first.",
+      "viewProcessing": "View Processing Status",
+      "goToUpload": "Go to Upload",
       "field": "Field {number}",
       "accept": "Accept",
       "edit": "Edit",
@@ -262,7 +296,23 @@
       "confidenceMedium": "Medium confidence — review recommended",
       "confidenceLow": "Low confidence — manual review required",
       "multipleSuggestions": "Multiple entities detected — please choose:",
-      "entitySource": "Source: {filename}"
+      "entitySource": "Source: {filename}",
+      "viewDocument": "Source Documents",
+      "viewTemplate": "Template",
+      "templatePreviewSubtitle": "Template with {count} fields to fill",
+      "noFields": "No template fields detected",
+      "detectedFields": "{count} detected fields",
+      "noTemplateText": "No template text available",
+      "loadingTemplate": "Loading template...",
+      "sourceDocCount": "{count} source document(s)",
+      "noSourceDocs": "No source documents",
+      "loadingDocs": "Loading documents...",
+      "paragraphs": "paragraphs",
+      "fieldStatus": "Field Status",
+      "tableAddRow": "Add row",
+      "tableRemoveRow": "Remove row",
+      "tableAddColumn": "Add column",
+      "tableRemoveColumn": "Remove column"
     },
     "export": {
       "title": "Export Document",
@@ -270,7 +320,8 @@
       "pdf": "Export PDF",
       "credits": "This will use {credits} credit(s)",
       "downloading": "Preparing download...",
-      "success": "Document exported successfully!"
+      "success": "Document exported successfully!",
+      "exportFailed": "Export failed"
     }
   },
   "admin": {

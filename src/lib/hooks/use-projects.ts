@@ -1,6 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
+import { fetcher } from '@/lib/utils/fetcher';
 
 interface Project {
   _id: string;
@@ -9,6 +10,7 @@ interface Project {
   sourceDocuments: string[];
   templateDocument?: string;
   modelDocuments: string[];
+  aiCost?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -16,8 +18,6 @@ interface Project {
 interface ProjectsResponse {
   data: Project[];
 }
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function useProjects() {
   const { data, error, isLoading, mutate } = useSWR<ProjectsResponse>(

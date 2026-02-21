@@ -1,20 +1,28 @@
+/**
+ * AI Pipeline Orchestrator — 3-stage pipeline.
+ *
+ * Stage 1: parser         — Parse documents (OCR, text extraction, table detection)
+ * Stage 2: extract_analyze — Extract data + analyze style + map to template fields
+ * Stage 3: write_verify    — Generate text + verify quality
+ *
+ * Each stage output is persisted to MongoDB so stages can be re-run independently.
+ */
+
 import { PIPELINE_STAGES_ORDER, type PipelineStage } from '@/types/pipeline';
-import { runExtractorAgent } from './extractor-agent';
-import { runModelAgent } from './model-agent';
-import { runTemplateAgent } from './template-agent';
-import { runMappingAgent } from './mapping-agent';
-import { runWritingAgent } from './writing-agent';
-import { runVerificationAgent } from './verification-agent';
+import { runExtractAnalyzeAgent } from './extract-analyze-agent';
+import { runWriteVerifyAgent } from './write-verify-agent';
 import type { AgentResult } from './client';
 
 export interface PipelineContext {
   projectId: string;
   userId: string;
   hasModelDocument: boolean;
+  /** Agent 1 output: extracted data, style guide, field map */
   projectData?: Record<string, unknown>;
   modelMap?: Record<string, unknown>;
   templateSchema?: Record<string, unknown>;
   draftPlan?: Record<string, unknown>;
+  /** Agent 2 output: field completions + quality report */
   fieldCompletions?: Record<string, unknown>;
   qualityReport?: Record<string, unknown>;
 }
@@ -32,7 +40,7 @@ export interface StageResult {
 /**
  * Run the AI pipeline for a project.
  * If `singleStage` is provided, runs only that stage.
- * Otherwise runs all stages in order.
+ * Otherwise runs all 3 stages in order.
  */
 export async function runPipeline(
   projectId: string,
@@ -42,18 +50,11 @@ export async function runPipeline(
 
   const stages = singleStage
     ? [singleStage]
-    : PIPELINE_STAGES_ORDER.filter(
-        (stage) => stage !== 'model' || context.hasModelDocument
-      );
+    : PIPELINE_STAGES_ORDER;
 
   const results: StageResult[] = [];
 
   for (const stage of stages) {
-    if (stage === 'model' && !context.hasModelDocument) {
-      console.log(`[Pipeline] Skipping model stage — no model document`);
-      continue;
-    }
-
     const startTime = Date.now();
     console.log(`[Pipeline] Running stage: ${stage}`);
 
@@ -67,26 +68,36 @@ export async function runPipeline(
       };
       results.push(stageResult);
 
-      // Update context for downstream agents
+      // Update context for downstream stages
       switch (stage) {
-        case 'extractor':
-          context.projectData = result.output;
+        case 'parser':
+          // Parser doesn't produce AI context — it creates Extraction records
           break;
-        case 'model':
-          context.modelMap = result.output;
+        case 'extract_analyze': {
+          // Agent 1 outputs a combined JSON — split into legacy fields for compatibility
+          const output = result.output;
+          context.projectData = output.project_data as Record<string, unknown>;
+          context.modelMap = output.style_guide as Record<string, unknown>;
+          context.templateSchema = output.field_map as Record<string, unknown>;
+          context.draftPlan = output.field_map as Record<string, unknown>;
           break;
-        case 'template':
-          context.templateSchema = result.output;
+        }
+        case 'write_verify': {
+          // Agent 2 outputs field completions + quality report combined
+          const output = result.output;
+          context.fieldCompletions = {
+            fields: output.fields,
+            qualityScores: output.quality_scores,
+          };
+          context.qualityReport = {
+            global_score: output.global_score,
+            errors: output.errors,
+            warnings: output.warnings,
+            field_scores: output.quality_scores,
+            data_leakage_check: output.data_leakage_check,
+          };
           break;
-        case 'mapping':
-          context.draftPlan = result.output;
-          break;
-        case 'writing':
-          context.fieldCompletions = result.output;
-          break;
-        case 'verification':
-          context.qualityReport = result.output;
-          break;
+        }
       }
 
       // Persist stage output to project in MongoDB
@@ -128,6 +139,10 @@ async function buildContextFromProject(projectId: string): Promise<PipelineConte
   };
 }
 
+/**
+ * Persist stage output to the Project document in MongoDB.
+ * Maps new 3-stage outputs to existing project fields for backward compatibility.
+ */
 async function saveStageOutput(
   projectId: string,
   stage: PipelineStage,
@@ -136,25 +151,32 @@ async function saveStageOutput(
   const { connectToDatabase, Project } = await import('@/lib/db');
   await connectToDatabase();
 
-  const update: Record<string, Record<string, unknown>> = {};
+  const update: Record<string, unknown> = {};
+
   switch (stage) {
-    case 'extractor':
-      update['projectData'] = output;
+    case 'parser':
+      // Parser creates Extraction records — no project-level field
       break;
-    case 'model':
-      update['modelMap'] = output;
+    case 'extract_analyze':
+      // Split Agent 1 output into legacy project fields
+      update['projectData'] = output.project_data;
+      update['modelMap'] = output.style_guide;
+      update['templateSchema'] = output.field_map;
+      update['draftPlan'] = output.field_map;
       break;
-    case 'template':
-      update['templateSchema'] = output;
-      break;
-    case 'mapping':
-      update['draftPlan'] = output;
-      break;
-    case 'writing':
-      update['fieldCompletions'] = output;
-      break;
-    case 'verification':
-      update['qualityReport'] = output;
+    case 'write_verify':
+      // Split Agent 2 output into legacy project fields
+      update['fieldCompletions'] = {
+        fields: output.fields,
+        qualityScores: output.quality_scores,
+      };
+      update['qualityReport'] = {
+        global_score: output.global_score,
+        errors: output.errors,
+        warnings: output.warnings,
+        field_scores: output.quality_scores,
+        data_leakage_check: output.data_leakage_check,
+      };
       break;
   }
 
@@ -165,13 +187,12 @@ async function saveStageOutput(
 
 /**
  * Fetch raw text from Extraction collection for a set of documents.
- * Combines rawText from each extraction, prefixed with filename.
  */
 async function getDocumentTexts(
   projectId: string,
   role: 'source' | 'template' | 'model'
-): Promise<{ filename: string; content: string }[]> {
-  const { connectToDatabase, DocumentModel, Extraction } = await import('@/lib/db');
+): Promise<{ filename: string; content: string; tagId?: string; tagName?: string }[]> {
+  const { connectToDatabase, DocumentModel, Extraction, Tag } = await import('@/lib/db');
   await connectToDatabase();
 
   const docs = await DocumentModel.find({
@@ -180,20 +201,34 @@ async function getDocumentTexts(
     status: 'extracted',
   }).lean();
 
-  const results: { filename: string; content: string }[] = [];
+  // Resolve tag names for documents that have tags
+  const tagIds = [...new Set(docs.map((d) => d.tagId).filter(Boolean))] as string[];
+  const tagMap = new Map<string, string>();
+  if (tagIds.length > 0) {
+    const tags = await Tag.find({ _id: { $in: tagIds } }).lean();
+    for (const tag of tags) {
+      tagMap.set(String(tag._id), tag.name);
+    }
+  }
+
+  const results: { filename: string; content: string; tagId?: string; tagName?: string }[] = [];
 
   for (const doc of docs) {
     const extraction = await Extraction.findOne({
       documentId: String(doc._id),
     }).lean();
 
+    const tagId = doc.tagId as string | undefined;
+    const tagName = tagId ? tagMap.get(tagId) : undefined;
+
     if (extraction?.rawText) {
       results.push({
         filename: doc.originalFilename,
         content: extraction.rawText,
+        tagId,
+        tagName,
       });
     } else if (extraction?.blocks && extraction.blocks.length > 0) {
-      // Fallback: concatenate text from blocks
       const text = extraction.blocks
         .map((b) => (b as Record<string, unknown>).text ?? '')
         .filter(Boolean)
@@ -202,6 +237,8 @@ async function getDocumentTexts(
         results.push({
           filename: doc.originalFilename,
           content: text,
+          tagId,
+          tagName,
         });
       }
     }
@@ -211,83 +248,213 @@ async function getDocumentTexts(
 }
 
 /**
- * Run a single pipeline stage, routing to the appropriate agent.
+ * Run the Parser stage — parse all unparsed documents.
+ */
+async function runParserStage(projectId: string): Promise<AgentResult> {
+  const { connectToDatabase, DocumentModel, Extraction } = await import('@/lib/db');
+  await connectToDatabase();
+
+  const docs = await DocumentModel.find({
+    projectId,
+    status: { $in: ['uploaded', 'processing', 'failed'] },
+  });
+
+  if (docs.length === 0) {
+    const extractedDocs = await DocumentModel.find({ projectId, status: 'extracted' });
+    return {
+      output: {
+        parsed: extractedDocs.length,
+        skipped: 0,
+        failed: 0,
+        documents: extractedDocs.map((d) => ({
+          filename: d.originalFilename,
+          role: d.role,
+          status: 'already_extracted',
+        })),
+      },
+      tokenUsage: { inputTokens: 0, outputTokens: 0 },
+    };
+  }
+
+  const totalInputTokens = 0;
+  const totalOutputTokens = 0;
+  const results: Array<{ filename: string; role: string; status: string; chars?: number }> = [];
+
+  for (const doc of docs) {
+    const docId = String(doc._id);
+    console.log(`[ParserAgent] Parsing ${doc.originalFilename} (${doc.role}, ${doc.mimeType})...`);
+
+    try {
+      const cachedExtraction = await Extraction.findOne({ sha256: doc.sha256 });
+      if (cachedExtraction) {
+        console.log(`[ParserAgent] Cache hit for ${doc.originalFilename}`);
+        const existing = await Extraction.findOne({ documentId: docId });
+        if (!existing) {
+          await Extraction.create({
+            documentId: docId,
+            sha256: doc.sha256,
+            projectId,
+            blocks: cachedExtraction.blocks,
+            rawText: cachedExtraction.rawText,
+            tables: cachedExtraction.tables,
+            overallConfidence: cachedExtraction.overallConfidence,
+            language: cachedExtraction.language,
+            processingTimeMs: 0,
+          });
+        }
+        await DocumentModel.findByIdAndUpdate(docId, { status: 'extracted' });
+        results.push({
+          filename: doc.originalFilename,
+          role: doc.role,
+          status: 'cached',
+          chars: (cachedExtraction.rawText ?? '').length,
+        });
+        continue;
+      }
+
+      await DocumentModel.findByIdAndUpdate(docId, { status: 'processing' });
+      const { readDocumentFileWithFallback } = await import('@/lib/storage/tmp-storage');
+      const fileBuffer = await readDocumentFileWithFallback(doc.storageKey, docId);
+
+      const { parseDocument } = await import('@/lib/parsing/parse-pipeline');
+      const { calculateOverallConfidence } = await import('@/lib/parsing/confidence');
+
+      const parseResult = await parseDocument(fileBuffer, doc.originalFilename, doc.mimeType);
+
+      type BlockForConfidence = Parameters<typeof calculateOverallConfidence>[0][number];
+      const blocksForConfidence = parseResult.blocks as BlockForConfidence[];
+      const overall = calculateOverallConfidence(blocksForConfidence);
+
+      await Extraction.create({
+        documentId: docId,
+        sha256: doc.sha256,
+        projectId,
+        blocks: parseResult.blocks,
+        rawText: parseResult.rawText,
+        tables: parseResult.tables,
+        overallConfidence: overall.score,
+        language: parseResult.language,
+        processingTimeMs: parseResult.processingTimeMs,
+      });
+
+      await DocumentModel.findByIdAndUpdate(docId, {
+        status: 'extracted',
+        extractionBlocks: parseResult.blocks,
+        pageCount: parseResult.pageCount,
+        parsingErrors: overall.warnings.length > 0 ? overall.warnings : undefined,
+      });
+
+      console.log(
+        `[ParserAgent] Extracted ${doc.originalFilename}: ${parseResult.rawText.length} chars, ` +
+        `${parseResult.tables.length} tables, ${overall.score}% confidence`
+      );
+
+      results.push({
+        filename: doc.originalFilename,
+        role: doc.role,
+        status: 'extracted',
+        chars: parseResult.rawText.length,
+      });
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error(`[ParserAgent] Failed to parse ${doc.originalFilename}:`, errMsg);
+
+      await DocumentModel.findByIdAndUpdate(docId, {
+        status: 'failed',
+        parsingErrors: [errMsg],
+      });
+
+      results.push({
+        filename: doc.originalFilename,
+        role: doc.role,
+        status: 'failed',
+      });
+    }
+  }
+
+  const parsed = results.filter((r) => r.status === 'extracted' || r.status === 'cached').length;
+  const failed = results.filter((r) => r.status === 'failed').length;
+
+  const extractedSources = await DocumentModel.countDocuments({
+    projectId,
+    role: 'source',
+    status: 'extracted',
+  });
+
+  if (extractedSources === 0) {
+    throw new Error(
+      `Parser agent could not extract any source documents (${failed} failed). ` +
+      `The pipeline cannot proceed without at least one readable source document.`
+    );
+  }
+
+  return {
+    output: {
+      parsed,
+      failed,
+      skipped: 0,
+      documents: results,
+    },
+    tokenUsage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+  };
+}
+
+/**
+ * Run a single pipeline stage.
  */
 async function runStage(
   stage: PipelineStage,
   context: PipelineContext
 ): Promise<AgentResult> {
   switch (stage) {
-    case 'extractor': {
+    case 'parser':
+      return runParserStage(context.projectId);
+
+    case 'extract_analyze': {
       const sourceDocs = await getDocumentTexts(context.projectId, 'source');
       if (sourceDocs.length === 0) {
-        throw new Error('No extracted source documents found for extractor stage');
+        throw new Error('No extracted source documents found for extract_analyze stage');
       }
-      return runExtractorAgent({
-        documents: sourceDocs.map((d) => ({
-          filename: d.filename,
-          content: d.content,
-          role: 'source' as const,
-        })),
-      });
-    }
 
-    case 'model': {
-      const modelDocs = await getDocumentTexts(context.projectId, 'model');
-      if (modelDocs.length === 0) {
-        throw new Error('No extracted model documents found for model stage');
-      }
-      return runModelAgent({ documents: modelDocs });
-    }
+      const modelDocs = context.hasModelDocument
+        ? await getDocumentTexts(context.projectId, 'model')
+        : [];
 
-    case 'template': {
       const templateDocs = await getDocumentTexts(context.projectId, 'template');
       const templateDoc = templateDocs[0];
       if (!templateDoc) {
-        throw new Error('No extracted template document found for template stage');
+        throw new Error('No extracted template document found for extract_analyze stage');
       }
-      return runTemplateAgent(templateDoc.content);
-    }
 
-    case 'mapping': {
-      if (!context.projectData) {
-        throw new Error('Missing projectData for mapping stage — run extractor first');
-      }
-      if (!context.templateSchema) {
-        throw new Error('Missing templateSchema for mapping stage — run template first');
-      }
-      return runMappingAgent({
-        projectData: context.projectData,
-        modelMap: context.modelMap,
-        templateSchema: context.templateSchema,
+      return runExtractAnalyzeAgent({
+        sourceDocs: sourceDocs.map((d) => ({
+          filename: d.filename,
+          content: d.content,
+          tag: d.tagName,
+        })),
+        modelDocs: modelDocs.length > 0
+          ? modelDocs.map((d) => ({ filename: d.filename, content: d.content }))
+          : undefined,
+        templateDoc: {
+          filename: templateDoc.filename,
+          content: templateDoc.content,
+        },
+        projectId: context.projectId,
       });
     }
 
-    case 'writing': {
+    case 'write_verify': {
       if (!context.projectData) {
-        throw new Error('Missing projectData for writing stage — run extractor first');
+        throw new Error('Missing projectData for write_verify stage — run extract_analyze first');
       }
       if (!context.draftPlan) {
-        throw new Error('Missing draftPlan for writing stage — run mapping first');
+        throw new Error('Missing field map for write_verify stage — run extract_analyze first');
       }
-      return runWritingAgent({
+      return runWriteVerifyAgent({
         projectData: context.projectData,
-        modelMap: context.modelMap,
-        draftPlan: context.draftPlan,
-      });
-    }
-
-    case 'verification': {
-      if (!context.projectData) {
-        throw new Error('Missing projectData for verification stage — run extractor first');
-      }
-      if (!context.fieldCompletions) {
-        throw new Error('Missing fieldCompletions for verification stage — run writing first');
-      }
-      return runVerificationAgent({
-        projectData: context.projectData,
-        modelMap: context.modelMap,
-        fieldCompletions: context.fieldCompletions,
+        styleGuide: context.modelMap ?? {},
+        fieldMap: context.draftPlan,
+        projectId: context.projectId,
       });
     }
 

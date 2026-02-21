@@ -29,8 +29,17 @@ yarn-error.log*
 .env*.local
 !.env.local.example
 
-# vercel
-.vercel
+# local dev uploads
+.uploads/
+
+# dev-documents content (keep folder structure via .gitkeep)
+dev-documents/template/*
+dev-documents/model/*
+dev-documents/source/*
+!dev-documents/**/.gitkeep
+
+# docker
+docker-compose.override.yml
 
 # typescript
 *.tsbuildinfo

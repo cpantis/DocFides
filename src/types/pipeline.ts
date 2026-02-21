@@ -1,4 +1,4 @@
-export type PipelineStage = 'extractor' | 'model' | 'template' | 'mapping' | 'writing' | 'verification';
+export type PipelineStage = 'parser' | 'extract_analyze' | 'write_verify';
 export type PipelineStatus = 'queued' | 'running' | 'completed' | 'failed';
 
 export interface PipelineJob {
@@ -29,19 +29,20 @@ export interface PipelineStageResult {
 }
 
 export const AGENT_MODELS = {
+  parser: 'claude-sonnet-4-5-20250929',
+  extract_analyze: 'claude-sonnet-4-5-20250929',
+  write_verify: 'claude-sonnet-4-5-20250929',
+  // Keep old keys for backward compat with standalone agents
   extractor: 'claude-sonnet-4-5-20250929',
   model: 'claude-sonnet-4-5-20250929',
   template: 'claude-sonnet-4-5-20250929',
   mapping: 'claude-sonnet-4-5-20250929',
-  writing: 'claude-opus-4-6',
-  verification: 'claude-opus-4-6',
+  writing: 'claude-sonnet-4-5-20250929',
+  verification: 'claude-sonnet-4-5-20250929',
 } as const;
 
 export const PIPELINE_STAGES_ORDER: PipelineStage[] = [
-  'extractor',
-  'model',
-  'template',
-  'mapping',
-  'writing',
-  'verification',
+  'parser',
+  'extract_analyze',
+  'write_verify',
 ];

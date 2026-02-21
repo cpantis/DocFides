@@ -28,8 +28,6 @@ export function Footer() {
             <h4 className="text-sm font-semibold text-gray-900">{t('product')}</h4>
             <ul className="mt-4 space-y-3">
               <li><a href="#features" className="text-sm text-gray-500 hover:text-primary-600">{t('product')}</a></li>
-              <li><a href="#pricing" className="text-sm text-gray-500 hover:text-primary-600">{t('product')}</a></li>
-              <li><a href="#faq" className="text-sm text-gray-500 hover:text-primary-600">FAQ</a></li>
             </ul>
           </div>
 

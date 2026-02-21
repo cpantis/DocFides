@@ -11,9 +11,10 @@ export interface DocumentFile {
   format: DocumentFormat;
   sizeBytes: number;
   sha256: string;
-  r2Key: string;
+  storageKey: string;
   status: DocumentStatus;
   mimeType: string;
+  tagId?: string;
   pageCount?: number;
   createdAt: Date;
   updatedAt: Date;
