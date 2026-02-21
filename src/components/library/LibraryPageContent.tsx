@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useLibrary, type LibraryItem } from '@/lib/hooks/use-library';
+import { TagManager } from '@/components/dashboard/TagManager';
 
 type TabType = 'template' | 'model' | 'entity';
 
@@ -245,6 +246,17 @@ export function LibraryPageContent() {
             ))}
           </div>
         )}
+
+        {/* Document tags */}
+        <div className="mt-10 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <h2 className="font-heading text-lg font-semibold text-gray-900">
+            {t('tags.title')}
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">{t('tags.description')}</p>
+          <div className="mt-4">
+            <TagManager />
+          </div>
+        </div>
       </div>
     </div>
   );

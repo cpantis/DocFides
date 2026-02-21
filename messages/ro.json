@@ -226,6 +226,10 @@
       "select": "Selectează",
       "selected": "Selectat",
       "remove": "Elimină"
+    },
+    "tags": {
+      "title": "Etichete documente",
+      "description": "Gestionează etichetele pentru a categoriza documentele sursă pe rol de entitate."
     }
   },
   "dashboard": {

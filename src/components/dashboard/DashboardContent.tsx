@@ -4,20 +4,12 @@ import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { Plus, LayoutDashboard, AlertCircle, BookOpen } from 'lucide-react';
 import { useProjects } from '@/lib/hooks/use-projects';
-import { useUserStats } from '@/lib/hooks/use-user-stats';
 import { ProjectCard } from '@/components/project/ProjectCard';
-import { CreditsMeter } from './CreditsMeter';
-import { UsageChart } from './UsageChart';
-import { TimeSavedBadge } from './TimeSavedBadge';
-import { RecentActivity } from './RecentActivity';
-import { AlertBanner } from './AlertBanner';
-import { TagManager } from './TagManager';
 
 export function DashboardContent() {
   const t = useTranslations('dashboard');
   const tc = useTranslations('common');
   const { projects, isLoading, isError, mutate } = useProjects();
-  const { stats, isError: statsError } = useUserStats();
 
   const handleDelete = async (id: string) => {
     try {
@@ -63,7 +55,7 @@ export function DashboardContent() {
 
       <div className="mx-auto max-w-7xl px-6 py-8">
         {/* Connection error */}
-        {(isError || statsError) && (
+        {isError && (
           <div className="mb-6 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{tc('error')}</span>
@@ -76,33 +68,8 @@ export function DashboardContent() {
           </div>
         )}
 
-        {/* Credit alerts */}
-        {stats && <AlertBanner creditPercent={stats.credits.percentUsed} />}
-
-        {/* Stats grid */}
-        <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <CreditsMeter
-            used={stats?.credits.used ?? 0}
-            total={stats?.credits.total ?? 3}
-          />
-          <UsageChart />
-          <TimeSavedBadge hours={stats?.timeSavedHours ?? 0} />
-          <RecentActivity items={stats?.recentActivity ?? []} />
-        </div>
-
-        {/* Document tags */}
-        <div className="mt-8 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <h2 className="font-heading text-lg font-semibold text-gray-900">
-            {t('tags.title')}
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">{t('tags.description')}</p>
-          <div className="mt-4">
-            <TagManager />
-          </div>
-        </div>
-
         {/* Projects list */}
-        <div className="mt-10">
+        <div>
           <h2 className="font-heading text-lg font-semibold text-gray-900">
             {t('projectsHeading')}
           </h2>
