@@ -3,7 +3,6 @@
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { Shield, User } from 'lucide-react';
-import { LocaleSwitcher } from './LocaleSwitcher';
 import { MOCK_USER } from '@/lib/auth/mock-auth';
 
 export function DashboardHeader() {
@@ -20,7 +19,6 @@ export function DashboardHeader() {
         </Link>
 
         <div className="flex items-center gap-4">
-          <LocaleSwitcher />
           <div className="flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5">
             <User className="h-4 w-4 text-gray-600" />
             <span className="text-sm font-medium text-gray-700">{MOCK_USER.name}</span>

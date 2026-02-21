@@ -14,6 +14,6 @@ export default function middleware(req: Parameters<typeof intlMiddleware>[0]) {
 export const config = {
   matcher: [
     '/((?!api|_next|_vercel|.*\\..*).*)',
-    '/(en|ro)/:path*',
+    '/ro/:path*',
   ],
 };

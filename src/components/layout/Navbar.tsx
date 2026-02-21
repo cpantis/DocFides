@@ -5,7 +5,6 @@ import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { Menu, X, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
-import { LocaleSwitcher } from './LocaleSwitcher';
 
 const navLinks = [
   { href: '#how-it-works', key: 'howItWorks' },
@@ -57,7 +56,6 @@ export function Navbar() {
 
         {/* Desktop actions */}
         <div className="hidden items-center gap-3 md:flex">
-          <LocaleSwitcher />
           <Link
             href="/sign-in"
             className="text-sm font-medium text-gray-600 transition-colors hover:text-primary-600"
@@ -101,15 +99,12 @@ export function Navbar() {
               </a>
             ))}
             <hr className="border-gray-100" />
-            <div className="flex items-center justify-between">
-              <LocaleSwitcher />
-              <Link
-                href="/sign-in"
-                className="text-sm font-medium text-gray-600"
-              >
-                {tc('signIn')}
-              </Link>
-            </div>
+            <Link
+              href="/sign-in"
+              className="text-sm font-medium text-gray-600"
+            >
+              {tc('signIn')}
+            </Link>
             <Link
               href="/dashboard"
               className="rounded-lg bg-primary-600 px-5 py-2.5 text-center text-sm font-semibold text-white shadow-sm"

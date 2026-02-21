@@ -4,7 +4,7 @@ import { locales } from './config';
 
 export default getRequestConfig(async ({ requestLocale }) => {
   const requested = await requestLocale;
-  const locale = hasLocale(locales, requested) ? requested : 'en';
+  const locale = hasLocale(locales, requested) ? requested : 'ro';
 
   return {
     locale,

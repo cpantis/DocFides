@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils/cn';
 import type { Locale } from '@/i18n/config';
 
 const localeLabels: Record<Locale, string> = {
-  en: 'EN',
   ro: 'RO',
 };
 
