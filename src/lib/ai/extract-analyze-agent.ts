@@ -30,6 +30,10 @@ export interface ExtractAnalyzeInput {
     content: string;
   };
   projectId?: string;
+  /** Pre-processed library data */
+  libraryTemplateSchema?: Record<string, unknown>;
+  libraryStyleGuide?: Record<string, unknown>;
+  libraryEntityData?: Record<string, unknown>[];
 }
 
 export async function runExtractAnalyzeAgent(input: ExtractAnalyzeInput): Promise<AgentResult> {
@@ -52,14 +56,33 @@ export async function runExtractAnalyzeAgent(input: ExtractAnalyzeInput): Promis
   // Build template section
   const templateSection = `\n\n=== TEMPLATE DOCUMENT ===\n\n--- Template: ${input.templateDoc.filename} ---\n${input.templateDoc.content}`;
 
+  // Build library pre-processed data sections (if available)
+  let librarySection = '';
+  if (input.libraryTemplateSchema) {
+    librarySection += '\n\n=== PRE-PROCESSED TEMPLATE SCHEMA (from library) ===\n' +
+      'Use this schema for the field_map output instead of re-analyzing the template:\n' +
+      JSON.stringify(input.libraryTemplateSchema, null, 2);
+  }
+  if (input.libraryStyleGuide) {
+    librarySection += '\n\n=== PRE-PROCESSED STYLE GUIDE (from library) ===\n' +
+      'Use this style guide for the style_guide output instead of re-analyzing model docs:\n' +
+      JSON.stringify(input.libraryStyleGuide, null, 2);
+  }
+  if (input.libraryEntityData && input.libraryEntityData.length > 0) {
+    librarySection += '\n\n=== PRE-EXTRACTED ENTITY DATA (from library) ===\n' +
+      'Merge this data into project_data.entities:\n' +
+      JSON.stringify(input.libraryEntityData, null, 2);
+  }
+
   const userMessage =
     `Analyze ALL documents below in a single pass:\n` +
     `1. Extract factual data from source documents (organized by entity)\n` +
-    `2. ${input.modelDocs?.length ? 'Analyze style from model documents (STYLE ONLY, no facts)' : 'No model documents provided — skip style analysis, use empty object for style_guide'}\n` +
+    `2. ${input.modelDocs?.length || input.libraryStyleGuide ? 'Analyze style from model documents (STYLE ONLY, no facts)' : 'No model documents provided — skip style analysis, use empty object for style_guide'}\n` +
     `3. Identify and classify all template fields\n` +
     `4. Map extracted data to template fields\n\n` +
+    (librarySection ? 'NOTE: Some data is pre-processed from the library. Use it as-is and merge with newly extracted data where applicable.\n\n' : '') +
     `Use save_extract_analyze to return the combined result.\n\n` +
-    `=== SOURCE DOCUMENTS ===\n\n${sourceSection}${modelSection}${templateSection}`;
+    `=== SOURCE DOCUMENTS ===\n\n${sourceSection}${modelSection}${templateSection}${librarySection}`;
 
   const result = await callAgentWithRetry(
     {

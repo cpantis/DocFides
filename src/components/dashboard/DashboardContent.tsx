@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
-import { Plus, LayoutDashboard, AlertCircle } from 'lucide-react';
+import { Plus, LayoutDashboard, AlertCircle, BookOpen } from 'lucide-react';
 import { useProjects } from '@/lib/hooks/use-projects';
 import { useUserStats } from '@/lib/hooks/use-user-stats';
 import { ProjectCard } from '@/components/project/ProjectCard';
@@ -42,13 +42,22 @@ export function DashboardContent() {
               {t('title')}
             </h1>
           </div>
-          <Link
-            href="/dashboard/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700"
-          >
-            <Plus className="h-4 w-4" />
-            {t('newProject')}
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/dashboard/library"
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            >
+              <BookOpen className="h-4 w-4" />
+              {t('library')}
+            </Link>
+            <Link
+              href="/dashboard/new"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700"
+            >
+              <Plus className="h-4 w-4" />
+              {t('newProject')}
+            </Link>
+          </div>
         </div>
       </header>
 

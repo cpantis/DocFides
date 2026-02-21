@@ -25,6 +25,11 @@ export interface IProject extends Document {
   draftPlan?: Record<string, unknown>;
   fieldCompletions?: Record<string, unknown>;
   qualityReport?: Record<string, unknown>;
+  libraryRefs?: {
+    template?: Types.ObjectId;
+    model?: Types.ObjectId;
+    entities?: Types.ObjectId[];
+  };
   aiCost?: number;
   createdAt: Date;
   updatedAt: Date;
@@ -56,6 +61,11 @@ const ProjectSchema = new Schema<IProject>(
     draftPlan: { type: Schema.Types.Mixed },
     fieldCompletions: { type: Schema.Types.Mixed },
     qualityReport: { type: Schema.Types.Mixed },
+    libraryRefs: {
+      template: { type: Schema.Types.ObjectId, ref: 'LibraryItem' },
+      model: { type: Schema.Types.ObjectId, ref: 'LibraryItem' },
+      entities: [{ type: Schema.Types.ObjectId, ref: 'LibraryItem' }],
+    },
     aiCost: { type: Number, default: 0 },
   },
   { timestamps: true }

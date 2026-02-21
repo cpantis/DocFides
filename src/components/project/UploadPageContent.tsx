@@ -14,6 +14,8 @@ import {
 import { ModelDocBadge } from './ModelDocBadge';
 import { UploadZone } from './UploadZone';
 import { SourceDocumentList } from './SourceDocumentList';
+import { LibraryPicker } from '@/components/library/LibraryPicker';
+import type { LibraryItem } from '@/lib/hooks/use-library';
 
 interface UploadPageContentProps {
   projectId: string;
@@ -24,6 +26,51 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
   const tc = useTranslations('common');
   const { project, isLoading, mutate } = useProject(projectId);
   const [sourceRefreshKey, setSourceRefreshKey] = useState(0);
+  const [libraryTemplate, setLibraryTemplate] = useState<LibraryItem | null>(null);
+  const [libraryModel, setLibraryModel] = useState<LibraryItem | null>(null);
+
+  const handleLibrarySelect = async (type: 'template' | 'model', item: LibraryItem) => {
+    if (type === 'template') setLibraryTemplate(item);
+    else setLibraryModel(item);
+
+    // Save library ref to project
+    try {
+      await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          libraryRefs: {
+            ...(type === 'template' ? { template: item._id } : {}),
+            ...(type === 'model' ? { model: item._id } : {}),
+          },
+        }),
+      });
+      mutate();
+    } catch {
+      // Best-effort
+    }
+  };
+
+  const handleLibraryDeselect = async (type: 'template' | 'model') => {
+    if (type === 'template') setLibraryTemplate(null);
+    else setLibraryModel(null);
+
+    try {
+      await fetch(`/api/projects/${projectId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          libraryRefs: {
+            ...(type === 'template' ? { template: null } : {}),
+            ...(type === 'model' ? { model: null } : {}),
+          },
+        }),
+      });
+      mutate();
+    } catch {
+      // Best-effort
+    }
+  };
 
   const refreshSources = () => {
     mutate();
@@ -50,7 +97,7 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
   }
 
   const sourceCount = project.sourceDocuments?.length ?? 0;
-  const hasTemplate = !!project.templateDocument;
+  const hasTemplate = !!project.templateDocument || !!libraryTemplate;
   const hasSources = sourceCount > 0;
 
   return (
@@ -96,21 +143,28 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
             <h2 className="font-heading text-lg font-bold text-gray-900">
               {t('templateLabel')}
             </h2>
-            {hasTemplate && (
+            {(hasTemplate || libraryTemplate) && (
               <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                1 {t('uploaded')}
+                {libraryTemplate ? libraryTemplate.name : `1 ${t('uploaded')}`}
               </span>
             )}
           </div>
           <p className="mt-1 text-sm text-gray-500">{t('templateHint')}</p>
           <div className="mt-4">
-            <UploadZone
-              projectId={projectId}
-              role="template"
-              maxFiles={1}
-              existingCount={hasTemplate ? 1 : 0}
-              onUploadComplete={() => mutate()}
-            />
+            <LibraryPicker
+              type="template"
+              selectedId={libraryTemplate?._id}
+              onSelect={(item) => handleLibrarySelect('template', item)}
+              onDeselect={() => handleLibraryDeselect('template')}
+            >
+              <UploadZone
+                projectId={projectId}
+                role="template"
+                maxFiles={1}
+                existingCount={hasTemplate ? 1 : 0}
+                onUploadComplete={() => mutate()}
+              />
+            </LibraryPicker>
           </div>
         </section>
 
@@ -121,21 +175,28 @@ export function UploadPageContent({ projectId }: UploadPageContentProps) {
               {t('modelLabel')}
             </h2>
             <ModelDocBadge />
-            {(project.modelDocuments?.length ?? 0) > 0 && (
+            {((project.modelDocuments?.length ?? 0) > 0 || libraryModel) && (
               <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-700">
-                {project.modelDocuments?.length} {t('uploaded')}
+                {libraryModel ? libraryModel.name : `${project.modelDocuments?.length} ${t('uploaded')}`}
               </span>
             )}
           </div>
           <p className="mt-1 text-sm text-gray-500">{t('modelHint')}</p>
           <div className="mt-4">
-            <UploadZone
-              projectId={projectId}
-              role="model"
-              maxFiles={2}
-              existingCount={project.modelDocuments?.length ?? 0}
-              onUploadComplete={() => mutate()}
-            />
+            <LibraryPicker
+              type="model"
+              selectedId={libraryModel?._id}
+              onSelect={(item) => handleLibrarySelect('model', item)}
+              onDeselect={() => handleLibraryDeselect('model')}
+            >
+              <UploadZone
+                projectId={projectId}
+                role="model"
+                maxFiles={2}
+                existingCount={project.modelDocuments?.length ?? 0}
+                onUploadComplete={() => mutate()}
+              />
+            </LibraryPicker>
           </div>
         </section>
 

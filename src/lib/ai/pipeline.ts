@@ -25,6 +25,10 @@ export interface PipelineContext {
   /** Agent 2 output: field completions + quality report */
   fieldCompletions?: Record<string, unknown>;
   qualityReport?: Record<string, unknown>;
+  /** Pre-processed library data (skips parts of extract_analyze) */
+  libraryTemplateSchema?: Record<string, unknown>;
+  libraryStyleGuide?: Record<string, unknown>;
+  libraryEntityData?: Record<string, unknown>[];
 }
 
 export interface StageResult {
@@ -112,7 +116,7 @@ export async function runPipeline(
 }
 
 async function buildContextFromProject(projectId: string): Promise<PipelineContext> {
-  const { connectToDatabase, Project, DocumentModel } = await import('@/lib/db');
+  const { connectToDatabase, Project, DocumentModel, LibraryItem } = await import('@/lib/db');
   await connectToDatabase();
 
   const project = await Project.findById(projectId);
@@ -126,16 +130,72 @@ async function buildContextFromProject(projectId: string): Promise<PipelineConte
     status: { $ne: 'deleted' },
   });
 
+  // Check for library refs with pre-processed data
+  const libraryRefs = project.libraryRefs as {
+    template?: string;
+    model?: string;
+    entities?: string[];
+  } | undefined;
+
+  let libraryTemplateSchema: Record<string, unknown> | undefined;
+  let libraryStyleGuide: Record<string, unknown> | undefined;
+  let libraryEntityData: Record<string, unknown>[] | undefined;
+
+  if (libraryRefs) {
+    if (libraryRefs.template) {
+      const templateItem = await LibraryItem.findById(libraryRefs.template);
+      if (templateItem?.status === 'ready' && templateItem.processedData) {
+        libraryTemplateSchema = templateItem.processedData as Record<string, unknown>;
+        // Increment usage count
+        await LibraryItem.findByIdAndUpdate(libraryRefs.template, {
+          $inc: { usageCount: 1 },
+          lastUsedAt: new Date(),
+        });
+        console.log(`[Pipeline] Using library template schema: ${templateItem.name}`);
+      }
+    }
+
+    if (libraryRefs.model) {
+      const modelItem = await LibraryItem.findById(libraryRefs.model);
+      if (modelItem?.status === 'ready' && modelItem.processedData) {
+        libraryStyleGuide = modelItem.processedData as Record<string, unknown>;
+        await LibraryItem.findByIdAndUpdate(libraryRefs.model, {
+          $inc: { usageCount: 1 },
+          lastUsedAt: new Date(),
+        });
+        console.log(`[Pipeline] Using library style guide: ${modelItem.name}`);
+      }
+    }
+
+    if (libraryRefs.entities && libraryRefs.entities.length > 0) {
+      libraryEntityData = [];
+      for (const entityId of libraryRefs.entities) {
+        const entityItem = await LibraryItem.findById(entityId);
+        if (entityItem?.status === 'ready' && entityItem.processedData) {
+          libraryEntityData.push(entityItem.processedData as Record<string, unknown>);
+          await LibraryItem.findByIdAndUpdate(entityId, {
+            $inc: { usageCount: 1 },
+            lastUsedAt: new Date(),
+          });
+          console.log(`[Pipeline] Using library entity data: ${entityItem.name}`);
+        }
+      }
+    }
+  }
+
   return {
     projectId,
     userId: project.userId,
-    hasModelDocument: modelDocs > 0,
+    hasModelDocument: modelDocs > 0 || !!libraryStyleGuide,
     projectData: project.projectData as Record<string, unknown> | undefined,
     modelMap: project.modelMap as Record<string, unknown> | undefined,
     templateSchema: project.templateSchema as Record<string, unknown> | undefined,
     draftPlan: project.draftPlan as Record<string, unknown> | undefined,
     fieldCompletions: project.fieldCompletions as Record<string, unknown> | undefined,
     qualityReport: project.qualityReport as Record<string, unknown> | undefined,
+    libraryTemplateSchema,
+    libraryStyleGuide,
+    libraryEntityData,
   };
 }
 
@@ -422,7 +482,10 @@ async function runStage(
 
       const templateDocs = await getDocumentTexts(context.projectId, 'template');
       const templateDoc = templateDocs[0];
-      if (!templateDoc) {
+
+      // If library template schema is available, we still need a template doc reference
+      // but the AI can skip template analysis
+      if (!templateDoc && !context.libraryTemplateSchema) {
         throw new Error('No extracted template document found for extract_analyze stage');
       }
 
@@ -435,11 +498,14 @@ async function runStage(
         modelDocs: modelDocs.length > 0
           ? modelDocs.map((d) => ({ filename: d.filename, content: d.content }))
           : undefined,
-        templateDoc: {
-          filename: templateDoc.filename,
-          content: templateDoc.content,
-        },
+        templateDoc: templateDoc
+          ? { filename: templateDoc.filename, content: templateDoc.content }
+          : { filename: 'library-template', content: '[Template schema provided from library]' },
         projectId: context.projectId,
+        // Pass library pre-processed data to the agent
+        libraryTemplateSchema: context.libraryTemplateSchema,
+        libraryStyleGuide: context.libraryStyleGuide,
+        libraryEntityData: context.libraryEntityData,
       });
     }
 

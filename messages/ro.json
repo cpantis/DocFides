@@ -191,9 +191,47 @@
     "blog": "Blog",
     "copyright": "© {year} DocFides. Toate drepturile rezervate."
   },
+  "library": {
+    "title": "Bibliotecă",
+    "addItem": "Adaugă",
+    "tabs": {
+      "templates": "Șabloane",
+      "models": "Modele",
+      "entities": "Entități"
+    },
+    "descriptions": {
+      "template": "Șabloane reutilizabile cu scheme de câmpuri pre-analizate. Selectează din bibliotecă la crearea unui proiect pentru a sări peste analiza șablonului.",
+      "model": "Documente de referință stilistică cu ton, vocabular și tipare pre-extrase. Reutilizează în mai multe proiecte.",
+      "entity": "Date de entitate pre-extrase (companii, persoane, organizații). Atașează la proiecte fără re-încărcare."
+    },
+    "status": {
+      "uploaded": "Încărcat",
+      "processing": "Se procesează",
+      "ready": "Gata",
+      "failed": "Eșuat"
+    },
+    "noItems": "Nu ai încă elemente. Încarcă primul document pentru a-ți construi biblioteca.",
+    "uploadTitle": "Adaugă la {type}",
+    "itemName": "Nume",
+    "itemNamePlaceholder": "Introdu un nume descriptiv...",
+    "selectFile": "Selectează fișier",
+    "nameRequired": "Numele este obligatoriu",
+    "usedCount": "Folosit de {count}x",
+    "processingFailed": "Eșuat",
+    "picker": {
+      "libraryTab": "Din bibliotecă",
+      "uploadTab": "Încarcă nou",
+      "noReady": "Nu ai elemente gata în bibliotecă.",
+      "goToLibrary": "Gestionează biblioteca",
+      "select": "Selectează",
+      "selected": "Selectat",
+      "remove": "Elimină"
+    }
+  },
   "dashboard": {
     "title": "Panou de control",
     "newProject": "Proiect nou",
+    "library": "Bibliotecă",
     "projectsHeading": "Proiecte",
     "noProjects": "Nu ai încă niciun proiect. Creează primul!",
     "credits": {

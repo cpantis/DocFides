@@ -191,9 +191,47 @@
     "blog": "Blog",
     "copyright": "© {year} DocFides. All rights reserved."
   },
+  "library": {
+    "title": "Library",
+    "addItem": "Add Item",
+    "tabs": {
+      "templates": "Templates",
+      "models": "Models",
+      "entities": "Entities"
+    },
+    "descriptions": {
+      "template": "Reusable templates with pre-analyzed field schemas. Select from your library when creating a project to skip template analysis.",
+      "model": "Style reference documents with pre-extracted tone, vocabulary, and patterns. Reuse across multiple projects.",
+      "entity": "Pre-extracted entity data (companies, people, organizations). Attach to projects without re-uploading source documents."
+    },
+    "status": {
+      "uploaded": "Uploaded",
+      "processing": "Processing",
+      "ready": "Ready",
+      "failed": "Failed"
+    },
+    "noItems": "No items yet. Upload your first document to build your library.",
+    "uploadTitle": "Add to {type}",
+    "itemName": "Name",
+    "itemNamePlaceholder": "Enter a descriptive name...",
+    "selectFile": "Select File",
+    "nameRequired": "Name is required",
+    "usedCount": "Used {count}x",
+    "processingFailed": "Failed",
+    "picker": {
+      "libraryTab": "From Library",
+      "uploadTab": "Upload New",
+      "noReady": "No ready items in your library.",
+      "goToLibrary": "Manage Library",
+      "select": "Select",
+      "selected": "Selected",
+      "remove": "Remove"
+    }
+  },
   "dashboard": {
     "title": "Dashboard",
     "newProject": "New Project",
+    "library": "Library",
     "projectsHeading": "Projects",
     "noProjects": "No projects yet. Create your first one!",
     "credits": {
