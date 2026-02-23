@@ -13,6 +13,8 @@ const nextConfig: NextConfig = {
     'word-extractor',
     'xlsx',
     'pdf-lib',
+    '@napi-rs/canvas',
+    'pdfjs-dist',
   ],
   experimental: {
     serverActions: {
