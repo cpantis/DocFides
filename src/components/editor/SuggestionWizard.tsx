@@ -82,7 +82,7 @@ export function SuggestionWizard({
             ) : (
               <Save className="h-3.5 w-3.5" />
             )}
-            {isSaving ? 'Saving...' : 'Save Progress'}
+            {isSaving ? t('savingProgress') : t('saveProgress')}
           </button>
           <button
             onClick={onUndoAll}

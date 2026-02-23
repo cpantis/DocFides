@@ -208,7 +208,6 @@ export function EditorPageContent({ projectId }: EditorPageContentProps) {
               <TemplatePreview
                 projectId={projectId}
                 projectName={project.name}
-                fields={editor.fields}
                 currentFieldIndex={editor.currentFieldIndex}
                 currentPage={currentPage}
                 totalPages={totalPages}

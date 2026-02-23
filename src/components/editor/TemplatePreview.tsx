@@ -11,7 +11,6 @@ import { fetcher } from '@/lib/utils/fetcher';
 interface TemplatePreviewProps {
   projectId: string;
   projectName: string;
-  fields: EditorField[];
   currentFieldIndex: number;
   currentPage: number;
   totalPages: number;

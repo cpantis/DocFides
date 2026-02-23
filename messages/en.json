@@ -292,6 +292,8 @@
       "modified": "Modified",
       "undoField": "Undo",
       "undoAll": "Undo All",
+      "saveProgress": "Save Progress",
+      "savingProgress": "Saving...",
       "confidenceHigh": "High confidence",
       "confidenceMedium": "Medium confidence — review recommended",
       "confidenceLow": "Low confidence — manual review required",

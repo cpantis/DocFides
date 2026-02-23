@@ -292,6 +292,8 @@
       "modified": "Modificat",
       "undoField": "Anulează",
       "undoAll": "Anulează tot",
+      "saveProgress": "Salvează progresul",
+      "savingProgress": "Se salvează...",
       "confidenceHigh": "Încredere ridicată",
       "confidenceMedium": "Încredere medie — revizuire recomandată",
       "confidenceLow": "Încredere scăzută — revizuire manuală necesară",
