@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Building2, FileText, Trash2, ChevronRight } from 'lucide-react';
+import { Building2, FileText, Trash2, ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import type { Entity } from '@/lib/hooks/use-entities';
 
@@ -62,10 +62,13 @@ export function EntityCard({ entity, onSelect, onDelete }: EntityCardProps) {
         </div>
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-xs font-medium',
+            'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
             STATUS_STYLES[entity.status] ?? STATUS_STYLES.draft
           )}
         >
+          {entity.status === 'processing' && (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          )}
           {t(`status.${entity.status}`)}
         </span>
       </div>

@@ -8,6 +8,14 @@ import {
 } from '@/lib/utils/validation';
 import { hashFile } from '@/lib/utils/hash';
 import { saveTempFile } from '@/lib/storage/tmp-storage';
+import { processLibraryItem } from '@/lib/ai/library-processor';
+
+/** Fire-and-forget processing — logs errors but doesn't block the response */
+function processLibraryItemAsync(itemId: string): void {
+  processLibraryItem(itemId).catch((err) => {
+    console.error(`[LIBRARY_ENTITY] Background processing failed for ${itemId}:`, err);
+  });
+}
 
 const MAX_ENTITY_DOCUMENTS = 10;
 
@@ -77,7 +85,14 @@ export async function POST(
       uploadedAt: new Date(),
     });
 
+    // Store fileData in MongoDB for entity documents too (resilience)
+    const lastDoc = entity.documents[entity.documents.length - 1]!;
+    lastDoc.fileData = buffer;
+
     await entity.save();
+
+    // Trigger AI processing in the background (re-processes all entity documents)
+    processLibraryItemAsync(id);
 
     // Return entity without fileData
     const updated = await LibraryItem.findById(id)

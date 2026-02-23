@@ -8,6 +8,14 @@ import {
 } from '@/lib/utils/validation';
 import { hashFile } from '@/lib/utils/hash';
 import { saveTempFile, deleteTempFile } from '@/lib/storage/tmp-storage';
+import { processLibraryItem } from '@/lib/ai/library-processor';
+
+/** Fire-and-forget processing — logs errors but doesn't block the response */
+function processLibraryItemAsync(itemId: string): void {
+  processLibraryItem(itemId).catch((err) => {
+    console.error(`[LIBRARY_MODEL] Background processing failed for ${itemId}:`, err);
+  });
+}
 
 function generateLibraryStorageKey(userId: string, itemId: string, filename: string): string {
   const timestamp = Date.now();
@@ -79,6 +87,9 @@ export async function POST(
     modelItem.documents[0]!.fileData = buffer;
 
     await modelItem.save();
+
+    // Trigger AI processing in the background (non-blocking)
+    processLibraryItemAsync(id);
 
     const updated = await LibraryItem.findById(id)
       .select('-documents.fileData')

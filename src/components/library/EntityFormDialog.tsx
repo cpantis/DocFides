@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   X,
   Upload,
@@ -11,6 +11,8 @@ import {
   Trash2,
   Building2,
   Plus,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useEntity, type EntityDocument } from '@/lib/hooks/use-entities';
@@ -247,6 +249,15 @@ export function EntityFormDialog({ entityId, onClose, onSaved }: EntityFormDialo
     input.click();
   }, [isUploading, handleFiles]);
 
+  // Auto-poll when entity is processing (every 3 seconds)
+  useEffect(() => {
+    if (!entity || entity.status !== 'processing') return;
+    const interval = setInterval(() => {
+      mutateEntity();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [entity?.status, mutateEntity]);
+
   const hasPending = pendingFiles.some((f) => f.status === 'pending');
 
   if (!entity) {
@@ -380,6 +391,41 @@ export function EntityFormDialog({ entityId, onClose, onSaved }: EntityFormDialo
             <p className="mt-3 text-sm text-gray-400">{t('noDocuments')}</p>
           )}
         </div>
+
+        {/* AI Processing status */}
+        {entity.documents.length > 0 && entity.status === 'processing' && (
+          <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+            <div>
+              <p className="text-sm font-medium text-blue-800">{t('processing.inProgress')}</p>
+              <p className="text-xs text-blue-600">{t('processing.description')}</p>
+            </div>
+          </div>
+        )}
+
+        {entity.documents.length > 0 && entity.status === 'ready' && (
+          <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <div>
+              <p className="text-sm font-medium text-green-800">{t('processing.ready')}</p>
+              <p className="text-xs text-green-600">{t('processing.readyDescription')}</p>
+            </div>
+          </div>
+        )}
+
+        {entity.documents.length > 0 && entity.status === 'error' && (
+          <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            <XCircle className="h-4 w-4 text-red-600" />
+            <div>
+              <p className="text-sm font-medium text-red-800">{t('processing.failed')}</p>
+              <p className="text-xs text-red-600">
+                {(entity.processedData as Record<string, unknown>)?.error
+                  ? String((entity.processedData as Record<string, unknown>).error)
+                  : t('processing.failedDescription')}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Add documents section */}
         {remainingSlots > 0 && (

@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { FileText, Trash2, ChevronRight } from 'lucide-react';
+import { FileText, Trash2, ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import type { LibraryItemData } from '@/lib/hooks/use-library';
 import type { ReactNode } from 'react';
@@ -63,10 +63,13 @@ export function LibraryItemCard({ item, icon, translationPrefix, onSelect, onDel
       <div className="mt-4 flex items-center gap-3">
         <span
           className={cn(
-            'rounded-full px-2 py-0.5 text-xs font-medium',
+            'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
             STATUS_STYLES[item.status] ?? STATUS_STYLES.draft
           )}
         >
+          {item.status === 'processing' && (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          )}
           {t(`status.${item.status}`)}
         </span>
       </div>

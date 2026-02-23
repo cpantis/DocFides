@@ -371,9 +371,17 @@
       "confirmDelete": "Ștergi acest șablon? Proiectele existente care îl folosesc își vor păstra copia.",
       "status": {
         "draft": "Ciornă",
-        "processing": "Se procesează",
+        "processing": "Se analizează...",
         "ready": "Gata",
         "error": "Eroare"
+      },
+      "processing": {
+        "inProgress": "Se analizează șablonul...",
+        "description": "AI-ul identifică câmpurile, tipurile și indicațiile. Poate dura un minut.",
+        "ready": "Șablon analizat",
+        "readyDescription": "Câmpurile și structura au fost extrase. Gata de utilizare în proiecte.",
+        "failed": "Analiza a eșuat",
+        "failedDescription": "Șablonul nu a putut fi analizat. Încearcă să reîncarci documentul."
       },
       "errors": {
         "nameRequired": "Numele șablonului este obligatoriu",
@@ -403,9 +411,17 @@
       "confirmDelete": "Ștergi acest model? Proiectele existente care îl folosesc își vor păstra copia.",
       "status": {
         "draft": "Ciornă",
-        "processing": "Se procesează",
+        "processing": "Se analizează...",
         "ready": "Gata",
         "error": "Eroare"
+      },
+      "processing": {
+        "inProgress": "Se analizează modelul...",
+        "description": "AI-ul extrage stilul, tonul și modelele retorice. Poate dura un minut.",
+        "ready": "Ghid de stil extras",
+        "readyDescription": "Tonul, structura și vocabularul au fost analizate. Gata de utilizare în proiecte.",
+        "failed": "Analiza a eșuat",
+        "failedDescription": "Modelul nu a putut fi analizat. Încearcă să reîncarci documentul."
       },
       "errors": {
         "nameRequired": "Numele modelului este obligatoriu",
@@ -436,9 +452,17 @@
       "confirmDelete": "Ștergi această entitate? Proiectele existente care o folosesc își vor păstra copia.",
       "status": {
         "draft": "Ciornă",
-        "processing": "Se procesează",
+        "processing": "Se extrag datele...",
         "ready": "Gata",
         "error": "Eroare"
+      },
+      "processing": {
+        "inProgress": "Se extrag datele entității...",
+        "description": "AI-ul extrage datele firmei (CUI, adresă, reprezentant) din documente.",
+        "ready": "Date entitate extrase",
+        "readyDescription": "Informațiile firmei au fost extrase și validate. Gata de utilizare în proiecte.",
+        "failed": "Extragerea a eșuat",
+        "failedDescription": "Datele entității nu au putut fi extrase. Încearcă să reîncarci documentele."
       },
       "errors": {
         "nameRequired": "Numele entității este obligatoriu",

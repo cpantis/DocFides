@@ -35,7 +35,15 @@ function useLibraryItems(type: LibraryItemType) {
   const endpoint = `/api/library/${type === 'template' ? 'templates' : type === 'model' ? 'models' : 'entities'}`;
   const { data, error, isLoading, mutate } = useSWR<{ data: LibraryItemData[] }>(
     endpoint,
-    fetcher
+    fetcher,
+    {
+      // Auto-refresh when any item is in 'processing' state
+      refreshInterval: (latestData) => {
+        const items = latestData?.data ?? [];
+        const hasProcessing = items.some((item) => item.status === 'processing');
+        return hasProcessing ? 3000 : 0;
+      },
+    }
   );
 
   return {
