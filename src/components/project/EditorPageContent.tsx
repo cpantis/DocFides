@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { useProject } from '@/lib/hooks/use-projects';
@@ -25,6 +25,40 @@ export function EditorPageContent({ projectId }: EditorPageContentProps) {
   const [previewMode, setPreviewMode] = useState<PreviewMode>('document');
 
   const editor = useEditorState(projectId);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Compute total pages from field page values
+  const totalPages = useMemo(() => {
+    if (editor.fields.length === 0) return 1;
+    return Math.max(...editor.fields.map((f) => f.page), 1);
+  }, [editor.fields]);
+
+  // Compute page-filtered fields and their global indices
+  const { pageFields, pageFieldIndices } = useMemo(() => {
+    const pf: typeof editor.fields = [];
+    const pi: number[] = [];
+    editor.fields.forEach((field, idx) => {
+      if (field.page === currentPage) {
+        pf.push(field);
+        pi.push(idx);
+      }
+    });
+    return { pageFields: pf, pageFieldIndices: pi };
+  }, [editor.fields, currentPage]);
+
+  // Auto-switch page when the active field changes (e.g. after accept/skip advances)
+  useEffect(() => {
+    const activeField = editor.fields[editor.currentFieldIndex];
+    if (activeField && activeField.page !== currentPage) {
+      setCurrentPage(activeField.page);
+    }
+  }, [editor.currentFieldIndex, editor.fields]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handlePageChange = useCallback((page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  }, [totalPages]);
 
   if (isLoading) {
     return (
@@ -176,7 +210,12 @@ export function EditorPageContent({ projectId }: EditorPageContentProps) {
                 projectName={project.name}
                 fields={editor.fields}
                 currentFieldIndex={editor.currentFieldIndex}
+                currentPage={currentPage}
+                totalPages={totalPages}
+                pageFields={pageFields}
+                pageFieldIndices={pageFieldIndices}
                 onFieldClick={editor.goToField}
+                onPageChange={handlePageChange}
               />
             ) : (
               <DocumentPreview
@@ -190,7 +229,8 @@ export function EditorPageContent({ projectId }: EditorPageContentProps) {
           }
           right={
             <SuggestionWizard
-              fields={editor.fields}
+              pageFields={pageFields}
+              pageFieldIndices={pageFieldIndices}
               currentFieldIndex={editor.currentFieldIndex}
               progress={editor.progress}
               isSaving={editor.isSaving}

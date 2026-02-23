@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { useTranslations } from 'next-intl';
-import { FileText, Copy, BookOpen, Table2, Calculator, GitBranch } from 'lucide-react';
+import { FileText, ChevronLeft, ChevronRight, Copy, BookOpen, Table2, Calculator, GitBranch } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import type { EditorField, FieldStatus } from '@/lib/hooks/use-editor-state';
 import useSWR from 'swr';
@@ -13,7 +13,12 @@ interface TemplatePreviewProps {
   projectName: string;
   fields: EditorField[];
   currentFieldIndex: number;
+  currentPage: number;
+  totalPages: number;
+  pageFields: EditorField[];
+  pageFieldIndices: number[];
   onFieldClick: (index: number) => void;
+  onPageChange: (page: number) => void;
 }
 
 const CONTENT_TYPE_CONFIG = {
@@ -40,17 +45,22 @@ interface TextsResponse {
 }
 
 /**
- * Template preview showing the REAL extracted document text
- * with field annotations shown as inline cards between paragraphs.
+ * Template preview with page-by-page navigation.
+ * Field markers are numbered per-page and synchronized with the right panel.
  */
 export function TemplatePreview({
   projectId,
   projectName,
-  fields,
   currentFieldIndex,
+  currentPage,
+  totalPages,
+  pageFields,
+  pageFieldIndices,
   onFieldClick,
+  onPageChange,
 }: TemplatePreviewProps) {
   const t = useTranslations('project.editor');
+  const activeMarkerRef = useRef<HTMLButtonElement>(null);
 
   const { data: textsData } = useSWR<TextsResponse>(
     `/api/projects/${projectId}/texts`,
@@ -60,80 +70,110 @@ export function TemplatePreview({
   const templateText = textsData?.data?.template?.[0]?.text ?? null;
   const templateFilename = textsData?.data?.template?.[0]?.filename ?? '';
 
-  // Split text into paragraphs
-  const paragraphs = useMemo(() => {
+  // Split template text into pages by form feed, or treat as single page
+  const textPages = useMemo(() => {
     if (!templateText) return [];
-    return templateText
+    const pages = templateText.split(/\f/).map((p) => p.trim()).filter((p) => p.length > 0);
+    return pages.length > 0 ? pages : [templateText];
+  }, [templateText]);
+
+  // Get the text content for current page
+  const currentPageText = textPages[currentPage - 1] ?? '';
+  const paragraphs = useMemo(() => {
+    if (!currentPageText) return [];
+    return currentPageText
       .split(/\n{2,}/)
       .map((p) => p.trim())
       .filter((p) => p.length > 0);
-  }, [templateText]);
+  }, [currentPageText]);
 
-  // Group fields by section for the field sidebar
-  const sections = useMemo(() => {
-    const grouped: Record<string, { fields: EditorField[]; indices: number[] }> = {};
-    fields.forEach((field, idx) => {
-      const section = field.section || 'General';
-      if (!grouped[section]) {
-        grouped[section] = { fields: [], indices: [] };
-      }
-      grouped[section]!.fields.push(field);
-      grouped[section]!.indices.push(idx);
-    });
-    return Object.entries(grouped);
-  }, [fields]);
+  const effectivePageCount = Math.max(totalPages, textPages.length);
 
-  // Count fields by content type for legend
+  // Scroll active marker into view
+  useEffect(() => {
+    if (activeMarkerRef.current) {
+      activeMarkerRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [currentFieldIndex]);
+
+  // Count fields by content type for legend (this page only)
   const typeCounts = useMemo(() => {
     const counts: Partial<Record<EditorField['contentType'], number>> = {};
-    for (const field of fields) {
+    for (const field of pageFields) {
       counts[field.contentType] = (counts[field.contentType] ?? 0) + 1;
     }
     return counts;
-  }, [fields]);
+  }, [pageFields]);
 
   return (
-    <div className="h-full overflow-y-auto">
-      {/* Header */}
+    <div className="flex h-full flex-col">
+      {/* Header with page navigation */}
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white px-6 py-3">
-        <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-gray-400" />
-          <h2 className="text-sm font-semibold text-gray-900">{projectName}</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-gray-400" />
+            <h2 className="text-sm font-semibold text-gray-900">{projectName}</h2>
+          </div>
+
+          {/* Page navigation */}
+          {effectivePageCount > 1 && (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage <= 1}
+                className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <span className="min-w-[60px] text-center text-xs font-medium text-gray-600">
+                {t('page', { current: currentPage, total: effectivePageCount })}
+              </span>
+              <button
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage >= effectivePageCount}
+                className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
         </div>
+
         {templateFilename && (
           <p className="mt-0.5 text-xs text-gray-400">{templateFilename}</p>
         )}
 
         {/* Color legend */}
-        <div className="mt-2 flex flex-wrap gap-2">
-          {Object.entries(CONTENT_TYPE_CONFIG).map(([type, config]) => {
-            const count = typeCounts[type as EditorField['contentType']];
-            if (!count) return null;
-            const Icon = config.icon;
-            return (
-              <div
-                key={type}
-                className={cn(
-                  'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
-                  config.bg, config.text
-                )}
-              >
-                <Icon className="h-2.5 w-2.5" />
-                {config.label} ({count})
-              </div>
-            );
-          })}
-        </div>
+        {Object.keys(typeCounts).length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {Object.entries(CONTENT_TYPE_CONFIG).map(([type, config]) => {
+              const count = typeCounts[type as EditorField['contentType']];
+              if (!count) return null;
+              const Icon = config.icon;
+              return (
+                <div
+                  key={type}
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',
+                    config.bg, config.text
+                  )}
+                >
+                  <Icon className="h-2.5 w-2.5" />
+                  {config.label} ({count})
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      <div className="px-6 py-4">
-        {/* Actual document content */}
+      {/* Page content */}
+      <div className="flex-1 overflow-y-auto px-6 py-4">
         {templateText ? (
           <div className="mx-auto max-w-[640px]">
             {/* Document paper */}
             <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
               <div className="px-8 py-6">
-                {/* Render real text paragraphs */}
                 <div className="space-y-3">
                   {paragraphs.map((paragraph, pIdx) => (
                     <p
@@ -143,62 +183,74 @@ export function TemplatePreview({
                       {paragraph}
                     </p>
                   ))}
+
+                  {paragraphs.length === 0 && (
+                    <p className="text-sm italic text-gray-400">
+                      {t('noTemplateText')}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Field annotations below the document */}
-            <div className="mt-6">
-              <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">
-                {t('detectedFields', { count: fields.length })}
-              </h3>
-              <div className="space-y-4">
-                {sections.map(([sectionName, { fields: sectionFields, indices }]) => (
-                  <div key={sectionName}>
-                    <p className="mb-2 text-[11px] font-semibold text-gray-500">{sectionName}</p>
-                    <div className="space-y-1.5">
-                      {sectionFields.map((field, localIdx) => {
-                        const globalIdx = indices[localIdx]!;
-                        const isActive = globalIdx === currentFieldIndex;
-                        const typeConfig = CONTENT_TYPE_CONFIG[field.contentType] ?? CONTENT_TYPE_CONFIG.copy;
-                        const Icon = typeConfig.icon;
+            {/* Field markers for this page — numbered per-page */}
+            {pageFields.length > 0 && (
+              <div className="mt-6">
+                <h3 className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">
+                  {t('pageFields', { count: pageFields.length })}
+                </h3>
+                <div className="space-y-1.5">
+                  {pageFields.map((field, localIdx) => {
+                    const globalIdx = pageFieldIndices[localIdx]!;
+                    const isActive = globalIdx === currentFieldIndex;
+                    const typeConfig = CONTENT_TYPE_CONFIG[field.contentType] ?? CONTENT_TYPE_CONFIG.copy;
+                    const Icon = typeConfig.icon;
+                    const pageNumber = localIdx + 1;
 
-                        return (
-                          <button
-                            key={field.id}
-                            onClick={() => onFieldClick(globalIdx)}
-                            className={cn(
-                              'flex w-full items-center gap-2.5 rounded-lg border-2 border-dashed px-3 py-2 text-left transition-all',
-                              STATUS_FILL[field.status],
-                              isActive && 'ring-2 ring-primary-500 ring-offset-1 border-primary-400'
-                            )}
-                          >
-                            <span className={cn(
-                              'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-[10px] font-bold',
-                              typeConfig.bg, typeConfig.text
-                            )}>
-                              {globalIdx + 1}
-                            </span>
-                            <Icon className={cn('h-3 w-3 flex-shrink-0', typeConfig.text)} />
-                            <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-700">
-                              {field.label}
-                            </span>
-                            {field.currentValue && field.status !== 'pending' && (
-                              <span className="max-w-[120px] truncate text-[10px] text-gray-400">
-                                {field.currentValue}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                    return (
+                      <button
+                        key={field.id}
+                        ref={isActive ? activeMarkerRef : undefined}
+                        onClick={() => onFieldClick(globalIdx)}
+                        className={cn(
+                          'flex w-full items-center gap-2.5 rounded-lg border-2 border-dashed px-3 py-2 text-left transition-all',
+                          STATUS_FILL[field.status],
+                          isActive && 'ring-2 ring-primary-500 ring-offset-1 border-primary-400'
+                        )}
+                      >
+                        <span className={cn(
+                          'flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                          isActive
+                            ? 'bg-primary-600 text-white'
+                            : cn(typeConfig.bg, typeConfig.text)
+                        )}>
+                          {pageNumber}
+                        </span>
+                        <Icon className={cn('h-3.5 w-3.5 flex-shrink-0', typeConfig.text)} />
+                        <span className="min-w-0 flex-1 truncate text-xs font-medium text-gray-700">
+                          {field.label}
+                        </span>
+                        {field.currentValue && field.status !== 'pending' && (
+                          <span className="max-w-[120px] truncate text-[10px] text-gray-400">
+                            {field.currentValue}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
+
+            {pageFields.length === 0 && (
+              <div className="mt-6 rounded-lg border border-dashed border-gray-200 py-8 text-center">
+                <p className="text-xs text-gray-400">
+                  {t('noFieldsOnPage')}
+                </p>
+              </div>
+            )}
           </div>
         ) : (
-          /* Loading or no text */
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <FileText className="h-12 w-12 text-gray-200" />
             <p className="mt-3 text-sm text-gray-400">

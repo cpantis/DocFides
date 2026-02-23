@@ -19,6 +19,7 @@ export interface EditorField {
   expectedType: 'text' | 'number' | 'date' | 'list' | 'narrative';
   contentType: 'copy' | 'narrative' | 'table_fill' | 'computed' | 'conditional';
   section: string;
+  page: number;
   suggestions: FieldSuggestion[];
   confidence: number;
   status: FieldStatus;
@@ -123,13 +124,16 @@ export function useEditorState(projectId: string) {
         }
       }
 
+      const location = (sf.location as Record<string, unknown>) ?? {};
+
       return {
         id: fieldId,
         label: (sf.hint as string) ?? (sf.id as string) ?? `Field ${idx + 1}`,
         hint: (sf.userHint as string) ?? (sf.hint as string) ?? '',
         expectedType: (sf.expectedType as EditorField['expectedType']) ?? 'text',
         contentType: (sf.contentType as EditorField['contentType']) ?? 'copy',
-        section: ((sf.location as Record<string, unknown>)?.section as string) ?? '',
+        section: (location.section as string) ?? '',
+        page: typeof location.page === 'number' ? location.page : 1,
         suggestions,
         confidence: avgConfidence,
         status: 'pending' as FieldStatus,
