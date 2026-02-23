@@ -1,8 +1,6 @@
 import { AGENT_MODELS } from '@/types/pipeline';
 import { TEMPLATE_SYSTEM_PROMPT } from './prompts/template';
-import { callAgentWithRetry, type AgentResult } from './client';
-import type { PdfFormField } from '@/lib/docgen/pdf-template-detector';
-import type { ImageBlockParam, TextBlockParam } from '@anthropic-ai/sdk/resources/messages';
+import { callGeminiWithRetry, type AgentResult } from './gemini-client';
 
 export interface TemplateAgentInput {
   /** Extracted text content from the template */
@@ -10,8 +8,8 @@ export interface TemplateAgentInput {
   /** Template format: docx, acroform PDF, or flat PDF */
   templateType?: 'docx' | 'acroform' | 'flat_pdf';
   /** AcroForm fields detected by pdf-lib (for PDF templates) */
-  pdfFormFields?: PdfFormField[];
-  /** Base64-encoded page images for flat PDF templates (Claude Vision) */
+  pdfFormFields?: Array<{ name: string; type: string; value?: string }>;
+  /** Base64-encoded page images for flat PDF templates (Gemini Vision) */
   pageImages?: Array<{ page: number; base64: string; mimeType: string }>;
 }
 
@@ -20,7 +18,7 @@ export interface TemplateAgentInput {
  *
  * For DOCX: identifies placeholders ({{field}}, [Field], _____)
  * For AcroForm PDF: maps form field names to data types using surrounding context
- * For flat PDF: uses Claude Vision to identify field positions visually
+ * For flat PDF: uses Gemini Vision to identify field positions visually
  */
 export async function runTemplateAgent(input: string | TemplateAgentInput): Promise<AgentResult> {
   // Support both old (string) and new (object) call signature
@@ -30,7 +28,7 @@ export async function runTemplateAgent(input: string | TemplateAgentInput): Prom
 
   // Build the user message based on template type
   let userMessage: string;
-  const messageContent: Array<TextBlockParam | ImageBlockParam> = [];
+  const inlineData: Array<{ mimeType: string; data: string }> = [];
 
   if (config.templateType === 'acroform' && config.pdfFormFields) {
     userMessage =
@@ -57,20 +55,12 @@ export async function runTemplateAgent(input: string | TemplateAgentInput): Prom
 
     // Add page images for Vision analysis if available
     if (config.pageImages && config.pageImages.length > 0) {
-      messageContent.push({ type: 'text' as const, text: userMessage });
       for (const img of config.pageImages) {
-        messageContent.push({
-          type: 'image' as const,
-          source: {
-            type: 'base64' as const,
-            media_type: img.mimeType as 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp',
-            data: img.base64,
-          },
+        inlineData.push({
+          mimeType: img.mimeType,
+          data: img.base64,
         });
-        messageContent.push({
-          type: 'text' as const,
-          text: `[Page ${img.page + 1} image above — identify all fillable fields with exact coordinates]`,
-        });
+        userMessage += `\n\n[Page ${img.page + 1} image included — identify all fillable fields with exact coordinates]`;
       }
     }
   } else {
@@ -107,16 +97,13 @@ export async function runTemplateAgent(input: string | TemplateAgentInput): Prom
     },
   };
 
-  const messages = messageContent.length > 0
-    ? [{ role: 'user' as const, content: messageContent }]
-    : [{ role: 'user' as const, content: userMessage }];
-
-  return callAgentWithRetry(
+  return callGeminiWithRetry(
     {
       model: AGENT_MODELS.template,
-      max_tokens: 8192,
-      temperature: 0.3, // Low temperature for deterministic field identification
       system: TEMPLATE_SYSTEM_PROMPT,
+      userMessage,
+      temperature: 0.3,
+      maxOutputTokens: 8192,
       tools: [
         {
           name: 'save_template_schema',
@@ -155,7 +142,7 @@ export async function runTemplateAgent(input: string | TemplateAgentInput): Prom
           },
         },
       ],
-      messages,
+      ...(inlineData.length > 0 ? { inlineData } : {}),
     },
     'save_template_schema'
   );

@@ -35,7 +35,8 @@ export type BlockSource =
   | 'mammoth'
   | 'word-extractor'
   | 'xlsx'
-  | 'sharp-tesseract';
+  | 'sharp-tesseract'
+  | 'gemini';
 
 export interface ExtractionBlock {
   id: string;

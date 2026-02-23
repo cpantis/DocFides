@@ -11,7 +11,7 @@
 import { PIPELINE_STAGES_ORDER, type PipelineStage } from '@/types/pipeline';
 import { runExtractAnalyzeAgent } from './extract-analyze-agent';
 import { runWriteVerifyAgent } from './write-verify-agent';
-import type { AgentResult } from './client';
+import type { AgentResult } from './gemini-client';
 
 export interface PipelineContext {
   projectId: string;

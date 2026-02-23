@@ -28,17 +28,26 @@ export interface PipelineStageResult {
   error?: string;
 }
 
+/**
+ * Google Gemini model IDs used by each pipeline stage.
+ *
+ * - Parser: Gemini 2.5 Flash (fast, cheap — document parsing)
+ * - Extract & Analyze: Gemini 2.5 Pro (best quality for data extraction + field mapping)
+ * - Write & Verify: Gemini 2.5 Pro (best quality for text generation + verification)
+ * - Template/Model agents: Gemini 2.5 Flash (structural analysis)
+ */
 export const AGENT_MODELS = {
-  parser: 'claude-sonnet-4-5-20250929',
-  extract_analyze: 'claude-sonnet-4-5-20250929',
-  write_verify: 'claude-sonnet-4-5-20250929',
-  // Keep old keys for backward compat with standalone agents
-  extractor: 'claude-sonnet-4-5-20250929',
-  model: 'claude-sonnet-4-5-20250929',
-  template: 'claude-sonnet-4-5-20250929',
-  mapping: 'claude-sonnet-4-5-20250929',
-  writing: 'claude-sonnet-4-5-20250929',
-  verification: 'claude-sonnet-4-5-20250929',
+  parser: 'gemini-2.5-flash',
+  extract_analyze: 'gemini-2.5-pro',
+  write_verify: 'gemini-2.5-pro',
+  // Library processing agents
+  template: 'gemini-2.5-flash',
+  model: 'gemini-2.5-flash',
+  // Legacy keys for backward compatibility
+  extractor: 'gemini-2.5-flash',
+  mapping: 'gemini-2.5-flash',
+  writing: 'gemini-2.5-pro',
+  verification: 'gemini-2.5-pro',
 } as const;
 
 export const PIPELINE_STAGES_ORDER: PipelineStage[] = [
