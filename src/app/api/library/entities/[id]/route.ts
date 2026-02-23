@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
 import { connectToDatabase, LibraryItem } from '@/lib/db';
+import { deleteTempFile } from '@/lib/storage/tmp-storage';
 import { processLibraryItem } from '@/lib/ai/library-processor';
 
 const updateEntitySchema = z.object({
@@ -135,6 +136,11 @@ export async function DELETE(
     const entity = await LibraryItem.findOneAndDelete({ _id: id, userId, type: 'entity' });
     if (!entity) {
       return NextResponse.json({ error: 'Entity not found' }, { status: 404 });
+    }
+
+    // Clean up temp files
+    for (const doc of entity.documents) {
+      await deleteTempFile(doc.storageKey);
     }
 
     return NextResponse.json({ success: true });

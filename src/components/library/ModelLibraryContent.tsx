@@ -69,6 +69,16 @@ export function ModelLibraryContent() {
     }
   };
 
+  const handleRetry = async (id: string) => {
+    try {
+      const res = await fetch(`/api/library/models/${id}`, { method: 'PATCH' });
+      if (!res.ok) throw new Error();
+      mutate();
+    } catch {
+      // silent
+    }
+  };
+
   const icon = <BookOpen className="h-5 w-5 text-primary-600" />;
 
   return (
@@ -144,6 +154,7 @@ export function ModelLibraryContent() {
                 translationPrefix="library.models"
                 onSelect={setSelectedId}
                 onDelete={handleDelete}
+                onRetry={handleRetry}
               />
             ))}
           </div>

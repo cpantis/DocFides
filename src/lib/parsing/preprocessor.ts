@@ -83,26 +83,124 @@ export async function preprocessForOcr(
   };
 }
 
+// ---- PDF rendering via pdfjs-dist + @napi-rs/canvas ----
+// Sharp's libvips lacks poppler, so we use pdfjs-dist for PDF→image rendering.
+
+let pdfjsInitialized = false;
+
+async function ensurePdfjs() {
+  if (pdfjsInitialized) return;
+
+  const { DOMMatrix: CanvasDOMMatrix } = await import('@napi-rs/canvas');
+  if (typeof globalThis.DOMMatrix === 'undefined') {
+    (globalThis as Record<string, unknown>).DOMMatrix = CanvasDOMMatrix;
+  }
+
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const path = await import('path');
+
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = path.resolve(
+      'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs'
+    );
+  }
+
+  pdfjsInitialized = true;
+}
+
+async function loadPdfDocument(pdfBuffer: Buffer) {
+  await ensurePdfjs();
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+
+  const data = new Uint8Array(pdfBuffer);
+  const loadingTask = pdfjsLib.getDocument({
+    data,
+    useWorkerFetch: false,
+    isEvalSupported: false,
+    useSystemFonts: true,
+  });
+  return loadingTask.promise;
+}
+
 /**
- * Extract individual pages from a PDF as images for OCR processing.
- * Uses Sharp to convert PDF pages to PNG images.
+ * Extract a single page from a PDF as a PNG image for OCR processing.
+ * Uses pdfjs-dist for rendering + @napi-rs/canvas for image output.
+ * @param page 0-based page index
  */
 export async function pdfPageToImage(
   pdfBuffer: Buffer,
   page: number
 ): Promise<Buffer> {
-  // Sharp can read PDFs page by page
-  return sharp(pdfBuffer, { page, density: TARGET_DPI })
-    .png()
-    .toBuffer();
+  const { createCanvas } = await import('@napi-rs/canvas');
+
+  const doc = await loadPdfDocument(pdfBuffer);
+  try {
+    const pdfPage = await doc.getPage(page + 1); // pdfjs uses 1-based
+    const scale = TARGET_DPI / 72;
+    const viewport = pdfPage.getViewport({ scale });
+
+    const canvas = createCanvas(
+      Math.floor(viewport.width),
+      Math.floor(viewport.height)
+    );
+    const ctx = canvas.getContext('2d');
+
+    // @napi-rs/canvas context is compatible at runtime but types don't match
+    const renderParams = { canvasContext: ctx, viewport } as unknown;
+    await (pdfPage.render(renderParams as Parameters<typeof pdfPage.render>[0])).promise;
+
+    return canvas.toBuffer('image/png');
+  } finally {
+    doc.destroy();
+  }
 }
 
 /**
- * Get the number of pages in a PDF using Sharp metadata.
+ * Get the number of pages in a PDF using pdfjs-dist.
  */
 export async function getPdfPageCount(pdfBuffer: Buffer): Promise<number> {
-  const metadata = await sharp(pdfBuffer).metadata();
-  return metadata.pages ?? 1;
+  const doc = await loadPdfDocument(pdfBuffer);
+  const count = doc.numPages;
+  doc.destroy();
+  return count;
+}
+
+/**
+ * Extract text content from a specific PDF page using pdfjs-dist.
+ * More accurate than splitting the full-text dump by character count.
+ * @param page 0-based page index
+ */
+export async function getPdfPageText(
+  pdfBuffer: Buffer,
+  page: number
+): Promise<string> {
+  const doc = await loadPdfDocument(pdfBuffer);
+  try {
+    const pdfPage = await doc.getPage(page + 1);
+    const textContent = await pdfPage.getTextContent();
+
+    let lastY: number | null = null;
+    const parts: string[] = [];
+
+    for (const item of textContent.items) {
+      if (!('str' in item)) continue;
+      const textItem = item as { str: string; transform: number[] };
+      const y = textItem.transform[5];
+
+      if (lastY !== null && Math.abs((y ?? 0) - lastY) > 5) {
+        parts.push('\n');
+      } else if (parts.length > 0) {
+        parts.push(' ');
+      }
+
+      parts.push(textItem.str);
+      lastY = y ?? null;
+    }
+
+    return parts.join('').trim();
+  } finally {
+    doc.destroy();
+  }
 }
 
 /**
