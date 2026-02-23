@@ -18,6 +18,7 @@ export async function runModelAgent(input: ModelAgentInput): Promise<AgentResult
     {
       model: AGENT_MODELS.model,
       max_tokens: 8192,
+      temperature: 0.3, // Low temperature for consistent style extraction
       system: MODEL_SYSTEM_PROMPT,
       tools: [
         {

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
 import { connectToDatabase, LibraryItem } from '@/lib/db';
+import { deleteTempFile } from '@/lib/storage/tmp-storage';
+import { processLibraryItem } from '@/lib/ai/library-processor';
 
 const updateEntitySchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -72,6 +74,52 @@ export async function PUT(
   }
 }
 
+/** PATCH /api/library/entities/[id] — retry failed processing */
+export async function PATCH(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { id } = await params;
+
+    await connectToDatabase();
+
+    const entity = await LibraryItem.findOne({ _id: id, userId, type: 'entity' });
+    if (!entity) {
+      return NextResponse.json({ error: 'Entity not found' }, { status: 404 });
+    }
+
+    if (entity.status === 'processing') {
+      return NextResponse.json({ error: 'Already processing' }, { status: 409 });
+    }
+
+    // Reset failed documents to 'uploaded' so they can be re-processed
+    for (const doc of entity.documents) {
+      if (doc.status === 'failed') {
+        doc.status = 'uploaded';
+      }
+    }
+    entity.status = 'draft';
+    entity.processedData = undefined;
+    await entity.save();
+
+    // Fire-and-forget re-processing
+    processLibraryItem(id).catch((err) => {
+      console.error(`[LIBRARY_ENTITY_RETRY] Background processing failed for ${id}:`, err);
+    });
+
+    // Refetch without fileData for the response
+    const updated = await LibraryItem.findById(id).select('-documents.fileData').lean();
+    return NextResponse.json({ data: updated });
+  } catch (error) {
+    console.error('[LIBRARY_ENTITY_RETRY]', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 /** DELETE /api/library/entities/[id] — delete entity and all its documents */
 export async function DELETE(
   _req: NextRequest,
@@ -88,6 +136,11 @@ export async function DELETE(
     const entity = await LibraryItem.findOneAndDelete({ _id: id, userId, type: 'entity' });
     if (!entity) {
       return NextResponse.json({ error: 'Entity not found' }, { status: 404 });
+    }
+
+    // Clean up temp files
+    for (const doc of entity.documents) {
+      await deleteTempFile(doc.storageKey);
     }
 
     return NextResponse.json({ success: true });

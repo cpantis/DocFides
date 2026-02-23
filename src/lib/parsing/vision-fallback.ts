@@ -52,6 +52,7 @@ export async function extractPageWithVision(
     {
       model: VISION_MODEL,
       max_tokens: 4096,
+      temperature: 0.3,
       system: VISION_SYSTEM,
       tools: [
         {

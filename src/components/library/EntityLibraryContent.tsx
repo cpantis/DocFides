@@ -70,6 +70,16 @@ export function EntityLibraryContent() {
     }
   };
 
+  const handleRetry = async (id: string) => {
+    try {
+      const res = await fetch(`/api/library/entities/${id}`, { method: 'PATCH' });
+      if (!res.ok) throw new Error();
+      mutate();
+    } catch {
+      // silent — card will still show error state until next refresh
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -146,6 +156,7 @@ export function EntityLibraryContent() {
                 entity={entity}
                 onSelect={setSelectedEntityId}
                 onDelete={handleDelete}
+                onRetry={handleRetry}
               />
             ))}
           </div>

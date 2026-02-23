@@ -371,6 +371,7 @@
       "acceptedFormats": "Accepted: DOCX, PDF",
       "usedInProjects": "Used in {count} project(s)",
       "confirmDelete": "Delete this template? Existing projects that use it will keep their copy.",
+      "retry": "Retry processing",
       "status": {
         "draft": "Draft",
         "processing": "Analyzing...",
@@ -411,6 +412,7 @@
       "styleRefBadge": "Style reference only",
       "usedInProjects": "Used in {count} project(s)",
       "confirmDelete": "Delete this model? Existing projects that use it will keep their copy.",
+      "retry": "Retry processing",
       "status": {
         "draft": "Draft",
         "processing": "Analyzing...",
@@ -452,6 +454,7 @@
       "usedInProjects": "Used in {count} project(s)",
       "lastUsed": "Last used {date}",
       "confirmDelete": "Delete this entity? Existing projects that use it will keep their copy.",
+      "retry": "Retry processing",
       "status": {
         "draft": "Draft",
         "processing": "Extracting...",

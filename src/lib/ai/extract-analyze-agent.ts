@@ -65,6 +65,7 @@ export async function runExtractAnalyzeAgent(input: ExtractAnalyzeInput): Promis
     {
       model: AGENT_MODELS.extract_analyze,
       max_tokens: 16384,
+      temperature: 0.3,
       system: EXTRACT_ANALYZE_SYSTEM_PROMPT,
       tools: [
         {

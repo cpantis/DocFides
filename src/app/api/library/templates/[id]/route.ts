@@ -3,6 +3,7 @@ import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
 import { connectToDatabase, LibraryItem } from '@/lib/db';
 import { deleteTempFile } from '@/lib/storage/tmp-storage';
+import { processLibraryItem } from '@/lib/ai/library-processor';
 
 const updateTemplateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
@@ -69,6 +70,41 @@ export async function PUT(
       return NextResponse.json({ error: error.errors }, { status: 400 });
     }
     console.error('[LIBRARY_TEMPLATE_PUT]', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/** PATCH /api/library/templates/[id] — retry failed processing */
+export async function PATCH(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { id } = await params;
+    await connectToDatabase();
+
+    const item = await LibraryItem.findOne({ _id: id, userId, type: 'template' });
+    if (!item) return NextResponse.json({ error: 'Template not found' }, { status: 404 });
+    if (item.status === 'processing') return NextResponse.json({ error: 'Already processing' }, { status: 409 });
+
+    for (const doc of item.documents) {
+      if (doc.status === 'failed') doc.status = 'uploaded';
+    }
+    item.status = 'draft';
+    item.processedData = undefined;
+    await item.save();
+
+    processLibraryItem(id).catch((err) => {
+      console.error(`[LIBRARY_TEMPLATE_RETRY] Background processing failed for ${id}:`, err);
+    });
+
+    const updated = await LibraryItem.findById(id).select('-documents.fileData').lean();
+    return NextResponse.json({ data: updated });
+  } catch (error) {
+    console.error('[LIBRARY_TEMPLATE_RETRY]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

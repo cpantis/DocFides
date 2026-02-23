@@ -22,6 +22,7 @@ export async function runMappingAgent(input: MappingInput): Promise<AgentResult>
     {
       model: AGENT_MODELS.mapping,
       max_tokens: 8192,
+      temperature: 0.3,
       system: MAPPING_SYSTEM_PROMPT,
       tools: [
         {

@@ -2,8 +2,8 @@
  * PDF text and table extraction — hybrid per-page strategy.
  *
  * For EACH page individually:
- * 1. Try pdf-parse (native text extraction)
- * 2. If < 50 chars → Sharp preprocessing → Tesseract OCR
+ * 1. Try pdfjs-dist native text extraction (per page, accurate)
+ * 2. If < 50 chars → render page to image → Tesseract OCR
  * 3. If OCR also < 50 chars → Vision API fallback on that single page
  * 4. Concatenate all page results in order
  *
@@ -46,46 +46,36 @@ export async function extractFromPdf(
 ): Promise<ParseResponse> {
   const startTime = Date.now();
 
-  // Step 1: Get page count and try native text extraction
+  // Step 1: Get page count using pdfjs-dist (accurate, no heuristics)
+  const { getPdfPageCount, getPdfPageText, pdfPageToImage } = await import('./preprocessor');
   let pageCount = 1;
-  let nativeTextPerPage: string[] = [];
 
   try {
-    const { PDFParse } = await import('pdf-parse');
-    const parser = new PDFParse({ data: new Uint8Array(buffer) });
-    const textResult = await parser.getText();
-    const fullText = textResult.text ?? '';
-
-    try {
-      const info = await parser.getInfo();
-      pageCount = (info as { total?: number }).total ?? Math.max(1, Math.ceil(fullText.length / 3000));
-    } catch {
-      pageCount = Math.max(1, Math.ceil(fullText.length / 3000));
-    }
-
-    await parser.destroy();
-
-    nativeTextPerPage = splitTextIntoPages(fullText, pageCount);
+    pageCount = await getPdfPageCount(buffer);
   } catch (error) {
-    console.warn(`[PdfExtractor] pdf-parse failed for ${filename}:`, error);
-    try {
-      const { getPdfPageCount } = await import('./preprocessor');
-      pageCount = await getPdfPageCount(buffer);
-    } catch {
-      // Default to 1
-    }
+    console.warn(`[PdfExtractor] Failed to get page count for ${filename}:`, error);
   }
+
+  console.log(`[PdfExtractor] ${filename}: ${pageCount} pages detected`);
 
   // Step 2: Process each page with the hybrid strategy
   const pageResults: PageResult[] = [];
 
   for (let page = 0; page < pageCount; page++) {
     const pageNum = page + 1;
-    const nativeText = (nativeTextPerPage[page] ?? '').trim();
 
-    // 2a. Try native text first
+    // 2a. Try native text extraction per page (accurate, from pdfjs-dist)
+    let nativeText = '';
+    if (!options?.forceOcr) {
+      try {
+        nativeText = await getPdfPageText(buffer, page);
+      } catch (err) {
+        console.warn(`[Parser] Page ${pageNum}: native text extraction failed:`, err);
+      }
+    }
+
     if (nativeText.length >= MIN_TEXT_THRESHOLD && !options?.forceOcr) {
-      console.log(`[Parser] Page ${pageNum}: native_text (pdf-parse, ${nativeText.length} chars)`);
+      console.log(`[Parser] Page ${pageNum}: native_text (pdfjs, ${nativeText.length} chars)`);
       pageResults.push({
         page: pageNum,
         method: 'native_text',
@@ -96,18 +86,18 @@ export async function extractFromPdf(
           type: 'text',
           content: nativeText,
           source: 'pdf-parse',
-          confidence: 92,
+          confidence: 95,
           page: pageNum,
           position: { x: 0, y: 0, w: 0, h: 0 },
           warnings: [],
         }],
         tables: extractTablesFromText(nativeText),
-        confidence: 92,
+        confidence: 95,
       });
       continue;
     }
 
-    // 2b. Native text insufficient — try OCR
+    // 2b. Native text insufficient — render page to image and run Tesseract OCR
     let ocrText = '';
     let ocrBlocks: ExtractionBlock[] = [];
     let ocrTables: TableData[] = [];
@@ -115,15 +105,16 @@ export async function extractFromPdf(
     let pageImage: Buffer | null = null;
 
     try {
-      const { pdfPageToImage } = await import('./preprocessor');
       const { recognizeImage } = await import('./ocr');
 
-      // Convert page to image once and cache for potential Vision fallback
+      // Render PDF page to 300 DPI PNG image
       pageImage = await pdfPageToImage(buffer, page);
+      console.log(`[Parser] Page ${pageNum}: rendered to image (${(pageImage.length / 1024).toFixed(0)} KB)`);
+
       const ocrResult = await recognizeImage(pageImage, {
         page: pageNum,
         source: 'sharp-tesseract',
-        // Skip preprocessing — pdfPageToImage already outputs a clean 300 DPI PNG
+        // Skip preprocessing — pdfPageToImage outputs a clean 300 DPI PNG
         skipPreprocess: true,
       });
 
@@ -136,7 +127,7 @@ export async function extractFromPdf(
     }
 
     if (ocrText.length >= MIN_TEXT_THRESHOLD) {
-      console.log(`[Parser] Page ${pageNum}: ocr (Tesseract, ${ocrText.length} chars)`);
+      console.log(`[Parser] Page ${pageNum}: ocr (Tesseract, ${ocrText.length} chars, ${ocrConfidence.toFixed(0)}% conf)`);
       pageResults.push({
         page: pageNum,
         method: 'ocr',
@@ -154,7 +145,6 @@ export async function extractFromPdf(
       try {
         // Reuse cached page image instead of converting again
         if (!pageImage) {
-          const { pdfPageToImage } = await import('./preprocessor');
           pageImage = await pdfPageToImage(buffer, page);
         }
 
@@ -242,18 +232,6 @@ export async function extractFromPdf(
     pageCount,
     processingTimeMs: Date.now() - startTime,
   };
-}
-
-function splitTextIntoPages(text: string, pageCount: number): string[] {
-  if (pageCount <= 1) return [text];
-  const ffSplit = text.split('\f');
-  if (ffSplit.length >= pageCount) return ffSplit.slice(0, pageCount);
-  const charsPerPage = Math.ceil(text.length / pageCount);
-  const pages: string[] = [];
-  for (let i = 0; i < pageCount; i++) {
-    pages.push(text.slice(i * charsPerPage, Math.min((i + 1) * charsPerPage, text.length)));
-  }
-  return pages;
 }
 
 function extractTablesFromText(text: string): TableData[] {

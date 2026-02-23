@@ -23,6 +23,7 @@ export async function runVerificationAgent(input: VerificationInput): Promise<Ag
     {
       model: AGENT_MODELS.verification,
       max_tokens: 8192,
+      temperature: 0.3,
       system: VERIFICATION_SYSTEM_PROMPT,
       tools: [
         {

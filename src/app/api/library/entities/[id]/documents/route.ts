@@ -69,6 +69,16 @@ export async function POST(
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const sha256 = await hashFile(buffer);
+
+    // Reject duplicate files (same content already uploaded to this entity)
+    const isDuplicate = entity.documents.some((d) => d.sha256 === sha256);
+    if (isDuplicate) {
+      return NextResponse.json(
+        { error: 'This file has already been uploaded to this entity' },
+        { status: 400 }
+      );
+    }
+
     const storageKey = generateLibraryStorageKey(userId, id, file.name);
     const format = file.name.split('.').pop()?.toLowerCase() ?? 'unknown';
 

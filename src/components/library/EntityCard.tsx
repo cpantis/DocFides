@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { Building2, FileText, Trash2, ChevronRight, Loader2 } from 'lucide-react';
+import { Building2, FileText, Trash2, ChevronRight, Loader2, RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import type { Entity } from '@/lib/hooks/use-entities';
 
@@ -9,6 +9,7 @@ interface EntityCardProps {
   entity: Entity;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
+  onRetry?: (id: string) => void;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -18,7 +19,7 @@ const STATUS_STYLES: Record<string, string> = {
   error: 'bg-red-100 text-red-700',
 };
 
-export function EntityCard({ entity, onSelect, onDelete }: EntityCardProps) {
+export function EntityCard({ entity, onSelect, onDelete, onRetry }: EntityCardProps) {
   const t = useTranslations('library.entities');
 
   return (
@@ -43,16 +44,30 @@ export function EntityCard({ entity, onSelect, onDelete }: EntityCardProps) {
           </div>
         </div>
 
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(entity._id);
-          }}
-          className="rounded-lg p-1.5 text-gray-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
-          title={t('confirmDelete')}
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          {entity.status === 'error' && onRetry && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRetry(entity._id);
+              }}
+              className="rounded-lg p-1.5 text-amber-500 transition-all hover:bg-amber-50 hover:text-amber-600"
+              title={t('retry')}
+            >
+              <RotateCw className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(entity._id);
+            }}
+            className="rounded-lg p-1.5 text-gray-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+            title={t('confirmDelete')}
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 flex items-center gap-3">

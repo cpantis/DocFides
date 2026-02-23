@@ -69,6 +69,16 @@ export function TemplateLibraryContent() {
     }
   };
 
+  const handleRetry = async (id: string) => {
+    try {
+      const res = await fetch(`/api/library/templates/${id}`, { method: 'PATCH' });
+      if (!res.ok) throw new Error();
+      mutate();
+    } catch {
+      // silent
+    }
+  };
+
   const icon = <LayoutTemplate className="h-5 w-5 text-primary-600" />;
 
   return (
@@ -144,6 +154,7 @@ export function TemplateLibraryContent() {
                 translationPrefix="library.templates"
                 onSelect={setSelectedId}
                 onDelete={handleDelete}
+                onRetry={handleRetry}
               />
             ))}
           </div>
