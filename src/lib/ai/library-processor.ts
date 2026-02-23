@@ -1,20 +1,39 @@
 /**
- * Library item processor — runs AI analysis on library documents at upload time.
+ * Library item processor — runs full AI analysis on library documents at upload time.
  *
- * - Template: parses document → runs Template Agent → saves template_schema as processedData
- * - Model: parses document → runs Model Agent → saves model_map (style/tone) as processedData
- * - Entity: parses all documents → runs Extractor Agent → saves entity_data as processedData
+ * Processing flow per type:
+ *   Template: parse (OCR/text/tables) → Template Agent → template_schema + rawText
+ *   Model:    parse (OCR/text/tables) → Model Agent → style_guide + rawText
+ *   Entity:   parse all docs (OCR/text/tables) → Extractor Agent → entity_data + rawTexts
+ *
+ * All parsed text (rawText) is stored in processedData so that when a project uses
+ * a library item, the pipeline can skip parser + extract_analyze and go directly
+ * to the write_verify stage using the cached results.
  *
  * Processing is async (non-blocking) — the upload returns immediately,
  * and the library item status transitions: draft → processing → ready | error.
  */
 
-import type { ILibraryItem } from '@/lib/db/models/library-item';
+import type { ILibraryItem, ILibraryDocument } from '@/lib/db/models/library-item';
+
+/**
+ * Result from parsing a single document through the full pipeline
+ * (OCR, text extraction, table detection, etc.)
+ */
+interface ParsedDocument {
+  filename: string;
+  rawText: string;
+  tables: Array<{ headers: string[]; rows: string[][]; confidence: number }>;
+  blocks: unknown[];
+  pageCount: number;
+  confidence: number;
+  language: string | null;
+}
 
 /**
  * Process a library item in the background.
- * Reads the document(s), parses them, runs the appropriate AI agent,
- * and stores the result in processedData.
+ * Reads the document(s), parses them through the full pipeline (OCR, text, tables),
+ * runs the appropriate AI agent, and stores everything in processedData.
  */
 export async function processLibraryItem(itemId: string): Promise<void> {
   const { connectToDatabase, LibraryItem } = await import('@/lib/db');
@@ -79,13 +98,11 @@ export async function processLibraryItem(itemId: string): Promise<void> {
 }
 
 /**
- * Parse a library document to extract text content.
+ * Parse a library document through the full pipeline (OCR, text extraction, tables).
  * Tries /tmp first, then falls back to fileData stored in MongoDB.
+ * Returns structured parsed data including rawText, tables, blocks.
  */
-async function getDocumentText(item: ILibraryItem, docIndex: number): Promise<string> {
-  const doc = item.documents[docIndex];
-  if (!doc) throw new Error(`Document at index ${docIndex} not found`);
-
+async function parseLibraryDocument(doc: ILibraryDocument): Promise<ParsedDocument> {
   const { readTempFile } = await import('@/lib/storage/tmp-storage');
   const { parseDocument } = await import('@/lib/parsing/parse-pipeline');
 
@@ -103,50 +120,73 @@ async function getDocumentText(item: ILibraryItem, docIndex: number): Promise<st
     }
   }
 
+  console.log(`[LibraryProcessor] Parsing ${doc.originalFilename} (${doc.mimeType}, ${(buffer.length / 1024).toFixed(0)} KB)`);
+
   const parseResult = await parseDocument(buffer, doc.originalFilename, doc.mimeType);
 
   // Store extraction blocks on the document for reference
   doc.extractionBlocks = parseResult.blocks as unknown as Record<string, unknown>[];
 
-  return parseResult.rawText;
+  console.log(
+    `[LibraryProcessor] Parsed ${doc.originalFilename}: ` +
+    `${parseResult.rawText.length} chars, ${parseResult.tables.length} tables, ` +
+    `${parseResult.overallConfidence}% confidence, lang=${parseResult.language ?? 'unknown'}`
+  );
+
+  return {
+    filename: doc.originalFilename,
+    rawText: parseResult.rawText,
+    tables: parseResult.tables,
+    blocks: parseResult.blocks,
+    pageCount: parseResult.pageCount,
+    confidence: parseResult.overallConfidence,
+    language: parseResult.language,
+  };
 }
 
 /**
- * Process a template — extract field schema using Template Agent.
+ * Process a template — parse + Template Agent → template_schema + rawText.
+ * Stores everything needed so the pipeline can skip parser + extract_analyze.
  */
 async function processTemplate(item: ILibraryItem): Promise<void> {
-  const content = await getDocumentText(item, 0);
+  const parsed = await parseLibraryDocument(item.documents[0]!);
 
-  if (!content || content.length < 10) {
+  if (!parsed.rawText || parsed.rawText.length < 10) {
     throw new Error('Template document has no extractable text content');
   }
 
   const { runTemplateAgent } = await import('@/lib/ai/template-agent');
 
-  const doc = item.documents[0]!;
-  const format = doc.format.toLowerCase();
+  const format = item.documents[0]!.format.toLowerCase();
   const templateType = format === 'pdf' ? 'flat_pdf' as const : 'docx' as const;
 
   const result = await runTemplateAgent({
-    content,
+    content: parsed.rawText,
     templateType,
   });
 
   item.processedData = {
     type: 'template_schema',
     templateSchema: result.output,
-    textLength: content.length,
+    // Store parsed text so pipeline can use it without re-parsing
+    rawText: parsed.rawText,
+    tables: parsed.tables,
+    textLength: parsed.rawText.length,
+    pageCount: parsed.pageCount,
+    confidence: parsed.confidence,
+    language: parsed.language,
     processedAt: new Date().toISOString(),
   };
 }
 
 /**
- * Process a model — extract style/tone using Model Agent.
+ * Process a model — parse + Model Agent → style_guide + rawText.
+ * Stores parsed text and AI-extracted style patterns.
  */
 async function processModel(item: ILibraryItem): Promise<void> {
-  const content = await getDocumentText(item, 0);
+  const parsed = await parseLibraryDocument(item.documents[0]!);
 
-  if (!content || content.length < 10) {
+  if (!parsed.rawText || parsed.rawText.length < 10) {
     throw new Error('Model document has no extractable text content');
   }
 
@@ -154,36 +194,37 @@ async function processModel(item: ILibraryItem): Promise<void> {
 
   const result = await runModelAgent({
     documents: [{
-      filename: item.documents[0]!.originalFilename,
-      content,
+      filename: parsed.filename,
+      content: parsed.rawText,
     }],
   });
 
   item.processedData = {
     type: 'style_guide',
     styleGuide: result.output,
-    textLength: content.length,
+    // Store parsed text so pipeline can use it without re-parsing
+    rawText: parsed.rawText,
+    textLength: parsed.rawText.length,
+    confidence: parsed.confidence,
+    language: parsed.language,
     processedAt: new Date().toISOString(),
   };
 }
 
 /**
- * Process an entity — extract factual data using Extractor Agent.
+ * Process an entity — parse all docs + Extractor Agent → entity_data + rawTexts.
+ * Stores all parsed document texts and the AI-extracted entity data.
  */
 async function processEntity(item: ILibraryItem): Promise<void> {
-  const documents: { filename: string; content: string }[] = [];
+  const parsedDocs: ParsedDocument[] = [];
 
-  for (let i = 0; i < item.documents.length; i++) {
-    const doc = item.documents[i]!;
+  for (const doc of item.documents) {
     if (doc.status === 'failed') continue;
 
     try {
-      const content = await getDocumentText(item, i);
-      if (content && content.length >= 10) {
-        documents.push({
-          filename: doc.originalFilename,
-          content,
-        });
+      const parsed = await parseLibraryDocument(doc);
+      if (parsed.rawText && parsed.rawText.length >= 10) {
+        parsedDocs.push(parsed);
       }
     } catch (err) {
       console.warn(
@@ -194,16 +235,16 @@ async function processEntity(item: ILibraryItem): Promise<void> {
     }
   }
 
-  if (documents.length === 0) {
+  if (parsedDocs.length === 0) {
     throw new Error('No entity documents could be parsed');
   }
 
   const { runExtractorAgent } = await import('@/lib/ai/extractor-agent');
 
   const result = await runExtractorAgent({
-    documents: documents.map((d) => ({
+    documents: parsedDocs.map((d) => ({
       filename: d.filename,
-      content: d.content,
+      content: d.rawText,
       role: 'source' as const,
     })),
   });
@@ -211,7 +252,15 @@ async function processEntity(item: ILibraryItem): Promise<void> {
   item.processedData = {
     type: 'entity_data',
     entityData: result.output,
-    documentCount: documents.length,
+    // Store all parsed document texts so pipeline can use them without re-parsing
+    documents: parsedDocs.map((d) => ({
+      filename: d.filename,
+      rawText: d.rawText,
+      tables: d.tables,
+      confidence: d.confidence,
+      language: d.language,
+    })),
+    documentCount: parsedDocs.length,
     processedAt: new Date().toISOString(),
   };
 }

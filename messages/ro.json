@@ -270,7 +270,9 @@
       "title": "Procesare AI",
       "steps": {
         "parsing": "Se citesc documentele (OCR, text, tabele)...",
+        "parsingSkipped": "Documentele sunt deja citite (din bibliotecă)",
         "extractAnalyzing": "Se extrag datele, se analizează stilul, se mapează câmpurile...",
+        "extractAnalyzingSkipped": "Datele sunt deja extrase (din bibliotecă)",
         "writeVerifying": "Se generează textul și se verifică calitatea..."
       },
       "complete": "Procesare completă!",

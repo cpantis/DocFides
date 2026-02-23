@@ -3,7 +3,7 @@
  * Requires ANTHROPIC_API_KEY to be set — fails clearly if AI is unavailable.
  */
 
-import { PIPELINE_STAGES_ORDER } from '@/types/pipeline';
+import { PIPELINE_STAGES_ORDER, type PipelineStage } from '@/types/pipeline';
 
 async function updateStageProgress(
   projectId: string,
@@ -143,22 +143,27 @@ export async function runPipelineBackground(
     return;
   }
 
-  // All 3 stages always run (model analysis is handled inside extract_analyze)
-  const stages = PIPELINE_STAGES_ORDER;
+  // Determine which stages to run based on pre-processed library data.
+  // If all documents are from library (already parsed + analyzed), skip to write_verify.
+  const stages = await determineRequiredStages(project);
 
-  // pipelineProgress is already initialized by the route handler.
-  // Re-initialize as safety net if it's missing.
-  if (!project.pipelineProgress || project.pipelineProgress.length === 0) {
-    const pipelineProgress = stages.map((stage) => ({
-      stage,
-      status: 'queued' as const,
-    }));
-    await Project.findByIdAndUpdate(projectId, {
-      $set: { pipelineProgress, status: 'processing' },
-    });
+  // Initialize pipelineProgress for all pipeline stages, marking skipped ones as completed
+  const allStages = PIPELINE_STAGES_ORDER;
+  const stagesToRun = new Set(stages);
+  const pipelineProgress = allStages.map((stage) => ({
+    stage,
+    status: stagesToRun.has(stage) ? ('queued' as const) : ('completed' as const),
+    ...(stagesToRun.has(stage) ? {} : { completedAt: new Date(), startedAt: new Date() }),
+  }));
+  await Project.findByIdAndUpdate(projectId, {
+    $set: { pipelineProgress, status: 'processing' },
+  });
+
+  const skippedStages = allStages.filter((s) => !stagesToRun.has(s));
+  if (skippedStages.length > 0) {
+    console.log(`[Pipeline] Skipping pre-processed stages: ${skippedStages.join(', ')}`);
   }
-
-  console.log(`[Pipeline] Starting AI pipeline for project ${projectId} (${sourceCount} source docs)`);
+  console.log(`[Pipeline] Starting AI pipeline for project ${projectId} (stages: ${stages.join(' → ')})`);
 
   for (const stage of stages) {
     // Mark stage as running
@@ -221,4 +226,54 @@ export async function runPipelineBackground(
   });
 
   console.log(`[Pipeline] Completed project ${projectId}`);
+}
+
+/**
+ * Determine which pipeline stages need to run based on pre-processed library data.
+ *
+ * Logic:
+ * - If the project already has projectData + templateSchema (from library linking),
+ *   skip 'parser' and 'extract_analyze' and go directly to 'write_verify'.
+ * - If there are non-library (directly uploaded) documents that haven't been parsed,
+ *   run all stages.
+ * - Otherwise, run all 3 stages as before.
+ */
+async function determineRequiredStages(
+  project: { _id: unknown; projectData?: unknown; templateSchema?: unknown; draftPlan?: unknown }
+): Promise<PipelineStage[]> {
+  const { DocumentModel } = await import('@/lib/db');
+  const projectId = String(project._id);
+
+  // Check if there are unparsed documents that need the parser
+  const unparsedCount = await DocumentModel.countDocuments({
+    projectId,
+    status: { $in: ['uploaded', 'processing', 'failed'] },
+  });
+
+  if (unparsedCount > 0) {
+    // Some documents haven't been parsed yet — run full pipeline
+    console.log(`[Pipeline] ${unparsedCount} unparsed documents found — running full pipeline`);
+    return [...PIPELINE_STAGES_ORDER];
+  }
+
+  // All documents are already parsed (status: 'extracted').
+  // Check if we have pre-processed extract_analyze data from library.
+  const hasProjectData = project.projectData && Object.keys(project.projectData as Record<string, unknown>).length > 0;
+  const hasTemplateSchema = project.templateSchema && Object.keys(project.templateSchema as Record<string, unknown>).length > 0;
+  const hasDraftPlan = project.draftPlan && Object.keys(project.draftPlan as Record<string, unknown>).length > 0;
+
+  if (hasProjectData && hasTemplateSchema && hasDraftPlan) {
+    // All data is pre-populated from library — skip directly to write_verify
+    console.log('[Pipeline] All data pre-processed from library — skipping to write_verify');
+    return ['write_verify'];
+  }
+
+  if (hasTemplateSchema) {
+    // Template is pre-processed but source data needs extraction — skip parser only
+    console.log('[Pipeline] Template pre-processed, running extract_analyze + write_verify');
+    return ['extract_analyze', 'write_verify'];
+  }
+
+  // No pre-processed data — run full pipeline
+  return [...PIPELINE_STAGES_ORDER];
 }
