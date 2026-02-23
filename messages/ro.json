@@ -344,6 +344,42 @@
       "aiCost": "Cost AI (luna aceasta)"
     }
   },
+  "library": {
+    "title": "Bibliotecă",
+    "entities": {
+      "title": "Entități",
+      "description": "Gestionează entitățile (firme, persoane). Fiecare entitate poate avea mai multe documente (cărți de identitate, extras CUI, certificate ONRC etc.) din care se extrag datele pentru completarea șabloanelor.",
+      "addEntity": "Adaugă entitate",
+      "noEntities": "Nu ai încă nicio entitate. Adaugă prima entitate pentru a reutiliza datele firmei în mai multe proiecte.",
+      "entityName": "Numele entității",
+      "entityNamePlaceholder": "ex: SC TANI DANONA SRL",
+      "entityDescription": "Descriere (opțional)",
+      "entityDescriptionPlaceholder": "ex: Beneficiar principal pentru proiecte AFIR",
+      "documents": "Documente",
+      "documentCount": "{count} document(e)",
+      "noDocuments": "Nu există documente încă. Adaugă documente pentru această entitate.",
+      "addDocument": "Adaugă document",
+      "removeDocument": "Șterge document",
+      "dropFiles": "Trage fișierele aici sau click pentru a selecta",
+      "maxDocuments": "Maximum {max} documente per entitate",
+      "usedInProjects": "Folosit în {count} proiect(e)",
+      "lastUsed": "Ultima utilizare {date}",
+      "confirmDelete": "Ștergi această entitate? Proiectele existente care o folosesc își vor păstra copia.",
+      "status": {
+        "draft": "Ciornă",
+        "processing": "Se procesează",
+        "ready": "Gata",
+        "error": "Eroare"
+      },
+      "errors": {
+        "nameRequired": "Numele entității este obligatoriu",
+        "createFailed": "Crearea entității a eșuat",
+        "deleteFailed": "Ștergerea entității a eșuat",
+        "uploadFailed": "Încărcarea documentului a eșuat",
+        "removeDocFailed": "Ștergerea documentului a eșuat"
+      }
+    }
+  },
   "auth": {
     "signIn": {
       "title": "Autentifică-te în DocFides",

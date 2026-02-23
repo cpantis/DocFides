@@ -2,7 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
-import { Plus, LayoutDashboard, AlertCircle } from 'lucide-react';
+import { Plus, LayoutDashboard, AlertCircle, Building2 } from 'lucide-react';
 import { useProjects } from '@/lib/hooks/use-projects';
 import { useUserStats } from '@/lib/hooks/use-user-stats';
 import { ProjectCard } from '@/components/project/ProjectCard';
@@ -16,6 +16,7 @@ import { TagManager } from './TagManager';
 export function DashboardContent() {
   const t = useTranslations('dashboard');
   const tc = useTranslations('common');
+  const tl = useTranslations('library');
   const { projects, isLoading, isError, mutate } = useProjects();
   const { stats, isError: statsError } = useUserStats();
 
@@ -89,6 +90,31 @@ export function DashboardContent() {
           <p className="mt-1 text-sm text-gray-500">{t('tags.description')}</p>
           <div className="mt-4">
             <TagManager />
+          </div>
+        </div>
+
+        {/* Library quick access */}
+        <div className="mt-8">
+          <h2 className="font-heading text-lg font-semibold text-gray-900">
+            {tl('title')}
+          </h2>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Link
+              href="/library/entities"
+              className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:border-primary-200 hover:shadow-md"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50">
+                <Building2 className="h-5 w-5 text-primary-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {tl('entities.title')}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {tl('entities.description').slice(0, 60)}...
+                </p>
+              </div>
+            </Link>
           </div>
         </div>
 
