@@ -371,9 +371,17 @@
       "confirmDelete": "Delete this template? Existing projects that use it will keep their copy.",
       "status": {
         "draft": "Draft",
-        "processing": "Processing",
+        "processing": "Analyzing...",
         "ready": "Ready",
         "error": "Error"
+      },
+      "processing": {
+        "inProgress": "Analyzing template...",
+        "description": "AI is identifying fields, types, and hints. This may take a minute.",
+        "ready": "Template analyzed",
+        "readyDescription": "Fields and structure have been extracted. Ready to use in projects.",
+        "failed": "Analysis failed",
+        "failedDescription": "The template could not be analyzed. Try re-uploading the document."
       },
       "errors": {
         "nameRequired": "Template name is required",
@@ -403,9 +411,17 @@
       "confirmDelete": "Delete this model? Existing projects that use it will keep their copy.",
       "status": {
         "draft": "Draft",
-        "processing": "Processing",
+        "processing": "Analyzing...",
         "ready": "Ready",
         "error": "Error"
+      },
+      "processing": {
+        "inProgress": "Analyzing model...",
+        "description": "AI is extracting style, tone, and rhetorical patterns. This may take a minute.",
+        "ready": "Style guide extracted",
+        "readyDescription": "Tone, structure, and vocabulary have been analyzed. Ready to use in projects.",
+        "failed": "Analysis failed",
+        "failedDescription": "The model could not be analyzed. Try re-uploading the document."
       },
       "errors": {
         "nameRequired": "Model name is required",
@@ -436,9 +452,17 @@
       "confirmDelete": "Delete this entity? Existing projects that use it will keep their copy.",
       "status": {
         "draft": "Draft",
-        "processing": "Processing",
+        "processing": "Extracting...",
         "ready": "Ready",
         "error": "Error"
+      },
+      "processing": {
+        "inProgress": "Extracting entity data...",
+        "description": "AI is extracting company data (CUI, address, representative) from documents.",
+        "ready": "Entity data extracted",
+        "readyDescription": "Company information has been extracted and validated. Ready to use in projects.",
+        "failed": "Extraction failed",
+        "failedDescription": "Entity data could not be extracted. Try re-uploading the documents."
       },
       "errors": {
         "nameRequired": "Entity name is required",

@@ -33,7 +33,15 @@ export interface Entity {
 export function useEntities() {
   const { data, error, isLoading, mutate } = useSWR<{ data: Entity[] }>(
     '/api/library/entities',
-    fetcher
+    fetcher,
+    {
+      // Auto-refresh when any entity is in 'processing' state
+      refreshInterval: (latestData) => {
+        const items = latestData?.data ?? [];
+        const hasProcessing = items.some((item) => item.status === 'processing');
+        return hasProcessing ? 3000 : 0;
+      },
+    }
   );
 
   return {

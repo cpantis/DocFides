@@ -1,7 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   X,
   Upload,
@@ -9,6 +9,8 @@ import {
   AlertCircle,
   Loader2,
   Trash2,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { useTemplate, useModel } from '@/lib/hooks/use-library';
@@ -200,6 +202,15 @@ export function SingleDocFormDialog({ itemId, type, icon, onClose, onSaved }: Si
     input.click();
   }, [isUploading, handleFile]);
 
+  // Auto-poll when item is processing (every 3 seconds)
+  useEffect(() => {
+    if (!item || item.status !== 'processing') return;
+    const interval = setInterval(() => {
+      mutateItem();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [item?.status, mutateItem]);
+
   const existingDoc = item?.documents[0];
 
   if (!item) {
@@ -319,6 +330,41 @@ export function SingleDocFormDialog({ itemId, type, icon, onClose, onSaved }: Si
             <p className="mt-3 text-sm text-gray-400">{t('noDocument')}</p>
           )}
         </div>
+
+        {/* AI Processing status */}
+        {existingDoc && item.status === 'processing' && (
+          <div className="flex items-center gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+            <div>
+              <p className="text-sm font-medium text-blue-800">{t('processing.inProgress')}</p>
+              <p className="text-xs text-blue-600">{t('processing.description')}</p>
+            </div>
+          </div>
+        )}
+
+        {existingDoc && item.status === 'ready' && (
+          <div className="flex items-center gap-3 rounded-xl border border-green-200 bg-green-50 px-4 py-3">
+            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <div>
+              <p className="text-sm font-medium text-green-800">{t('processing.ready')}</p>
+              <p className="text-xs text-green-600">{t('processing.readyDescription')}</p>
+            </div>
+          </div>
+        )}
+
+        {existingDoc && item.status === 'error' && (
+          <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            <XCircle className="h-4 w-4 text-red-600" />
+            <div>
+              <p className="text-sm font-medium text-red-800">{t('processing.failed')}</p>
+              <p className="text-xs text-red-600">
+                {(item.processedData as Record<string, unknown>)?.error
+                  ? String((item.processedData as Record<string, unknown>).error)
+                  : t('processing.failedDescription')}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Upload zone */}
         {!existingDoc && (
