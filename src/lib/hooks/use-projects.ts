@@ -3,6 +3,13 @@
 import useSWR from 'swr';
 import { fetcher } from '@/lib/utils/fetcher';
 
+interface LibraryRefData {
+  libraryItemId: string;
+  name: string;
+  processedData?: Record<string, unknown>;
+  copiedAt: string;
+}
+
 interface Project {
   _id: string;
   name: string;
@@ -10,6 +17,11 @@ interface Project {
   sourceDocuments: string[];
   templateDocument?: string;
   modelDocuments: string[];
+  libraryRefs?: {
+    template?: LibraryRefData;
+    model?: LibraryRefData;
+    entities?: LibraryRefData[];
+  };
   aiCost?: number;
   createdAt: string;
   updatedAt: string;
