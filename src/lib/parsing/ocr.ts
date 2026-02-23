@@ -56,7 +56,7 @@ export async function recognizeImage(
     warnings.push(...preprocessed.warnings);
   }
 
-  let worker = await getWorker();
+  const worker = await getWorker();
 
   // Wrap OCR in a timeout to prevent indefinite hangs on malformed images
   const OCR_TIMEOUT_MS = 60_000; // 60 seconds
