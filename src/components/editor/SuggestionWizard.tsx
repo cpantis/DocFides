@@ -7,7 +7,8 @@ import { EntitySelector } from './EntitySelector';
 import type { EditorField } from '@/lib/hooks/use-editor-state';
 
 interface SuggestionWizardProps {
-  fields: EditorField[];
+  pageFields: EditorField[];
+  pageFieldIndices: number[];
   currentFieldIndex: number;
   progress: { total: number; completed: number; percentage: number };
   isSaving: boolean;
@@ -29,7 +30,8 @@ interface SuggestionWizardProps {
  * navigation, and action buttons.
  */
 export function SuggestionWizard({
-  fields,
+  pageFields,
+  pageFieldIndices,
   currentFieldIndex,
   progress,
   isSaving,
@@ -80,7 +82,7 @@ export function SuggestionWizard({
             ) : (
               <Save className="h-3.5 w-3.5" />
             )}
-            {isSaving ? 'Saving...' : 'Save Progress'}
+            {isSaving ? t('savingProgress') : t('saveProgress')}
           </button>
           <button
             onClick={onUndoAll}
@@ -93,10 +95,13 @@ export function SuggestionWizard({
         </div>
       </div>
 
-      {/* Field list */}
+      {/* Field list — shows only fields for the current template page */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
         <div className="space-y-3">
-          {fields.map((field, index) => {
+          {pageFields.map((field, localIdx) => {
+            const globalIdx = pageFieldIndices[localIdx]!;
+            const pageNumber = localIdx + 1;
+
             // Show EntitySelector for multi-suggestion fields that haven't been resolved
             if (field.suggestions.length > 1 && field.status === 'pending') {
               return (
@@ -104,7 +109,7 @@ export function SuggestionWizard({
                   key={field.id}
                   fieldId={field.id}
                   label={field.label}
-                  fieldNumber={index + 1}
+                  fieldNumber={pageNumber}
                   suggestions={field.suggestions}
                   selectedEntity={field.selectedEntity}
                   onSelect={onSelectEntity}
@@ -116,22 +121,22 @@ export function SuggestionWizard({
               <FieldCard
                 key={field.id}
                 field={field}
-                fieldNumber={index + 1}
-                isActive={index === currentFieldIndex}
+                fieldNumber={pageNumber}
+                isActive={globalIdx === currentFieldIndex}
                 isRegenerating={isRegenerating === field.id}
                 onAccept={onAccept}
                 onEdit={onEdit}
                 onSkip={onSkip}
                 onRegenerate={onRegenerate}
                 onUndo={onUndo}
-                onClick={() => onGoToField(index)}
+                onClick={() => onGoToField(globalIdx)}
               />
             );
           })}
 
-          {fields.length === 0 && (
+          {pageFields.length === 0 && (
             <div className="py-12 text-center text-sm text-gray-400">
-              No fields to review. Run the AI pipeline first.
+              {t('noFieldsOnPage')}
             </div>
           )}
         </div>

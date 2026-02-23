@@ -292,6 +292,8 @@
       "modified": "Modified",
       "undoField": "Undo",
       "undoAll": "Undo All",
+      "saveProgress": "Save Progress",
+      "savingProgress": "Saving...",
       "confidenceHigh": "High confidence",
       "confidenceMedium": "Medium confidence — review recommended",
       "confidenceLow": "Low confidence — manual review required",
@@ -302,6 +304,9 @@
       "templatePreviewSubtitle": "Template with {count} fields to fill",
       "noFields": "No template fields detected",
       "detectedFields": "{count} detected fields",
+      "page": "{current} / {total}",
+      "pageFields": "{count} fields on this page",
+      "noFieldsOnPage": "No fields on this page",
       "noTemplateText": "No template text available",
       "loadingTemplate": "Loading template...",
       "sourceDocCount": "{count} source document(s)",
@@ -342,6 +347,42 @@
       "totalProjects": "Total Projects",
       "totalExports": "Total Exports",
       "aiCost": "AI Cost (this month)"
+    }
+  },
+  "library": {
+    "title": "Library",
+    "entities": {
+      "title": "Entities",
+      "description": "Manage company and person entities. Each entity can have multiple documents (ID cards, CUI extracts, ONRC certificates, etc.) that provide data for template filling.",
+      "addEntity": "Add Entity",
+      "noEntities": "No entities yet. Add your first entity to reuse company data across projects.",
+      "entityName": "Entity name",
+      "entityNamePlaceholder": "e.g., SC TANI DANONA SRL",
+      "entityDescription": "Description (optional)",
+      "entityDescriptionPlaceholder": "e.g., Main beneficiary for AFIR projects",
+      "documents": "Documents",
+      "documentCount": "{count} document(s)",
+      "noDocuments": "No documents yet. Add documents to this entity.",
+      "addDocument": "Add Document",
+      "removeDocument": "Remove document",
+      "dropFiles": "Drop files here or click to browse",
+      "maxDocuments": "Maximum {max} documents per entity",
+      "usedInProjects": "Used in {count} project(s)",
+      "lastUsed": "Last used {date}",
+      "confirmDelete": "Delete this entity? Existing projects that use it will keep their copy.",
+      "status": {
+        "draft": "Draft",
+        "processing": "Processing",
+        "ready": "Ready",
+        "error": "Error"
+      },
+      "errors": {
+        "nameRequired": "Entity name is required",
+        "createFailed": "Failed to create entity",
+        "deleteFailed": "Failed to delete entity",
+        "uploadFailed": "Failed to upload document",
+        "removeDocFailed": "Failed to remove document"
+      }
     }
   },
   "auth": {

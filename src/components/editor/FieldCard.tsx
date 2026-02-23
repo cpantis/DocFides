@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Check, Pencil, RotateCcw, SkipForward, Undo2, Loader2, X } from 'lucide-react';
+
 import { cn } from '@/lib/utils/cn';
 import { ConfidenceBadge } from '@/components/project/ConfidenceBadge';
 import type { EditorField, FieldStatus } from '@/lib/hooks/use-editor-state';
@@ -40,6 +41,7 @@ export function FieldCard({
   onClick,
 }: FieldCardProps) {
   const t = useTranslations('project.editor');
+  const tc = useTranslations('common');
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(field.currentValue);
 
@@ -130,7 +132,7 @@ export function FieldCard({
                 className="flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50"
               >
                 <X className="h-3 w-3" />
-                {t('skip')}
+                {tc('cancel')}
               </button>
             </div>
           </div>
