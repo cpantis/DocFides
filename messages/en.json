@@ -351,6 +351,70 @@
   },
   "library": {
     "title": "Library",
+    "description": "Reuse templates, models, and entities across projects. Save time by caching AI processing results.",
+    "templates": {
+      "title": "Templates",
+      "description": "Store document templates with cached field analysis. Reuse the same template across multiple projects without re-processing.",
+      "addTemplate": "Add Template",
+      "noTemplates": "No templates yet. Add your first template to reuse it across projects.",
+      "templateName": "Template name",
+      "templateNamePlaceholder": "e.g., Cerere finanțare AFIR",
+      "templateDescription": "Description (optional)",
+      "templateDescriptionPlaceholder": "e.g., Standard AFIR funding request template",
+      "document": "Document",
+      "noDocument": "No document uploaded. Upload a DOCX template.",
+      "replaceDocument": "Replace document",
+      "uploadTemplate": "Upload template document",
+      "dropFile": "Drop template file here or click to browse",
+      "acceptedFormats": "Accepted: DOCX, PDF",
+      "usedInProjects": "Used in {count} project(s)",
+      "confirmDelete": "Delete this template? Existing projects that use it will keep their copy.",
+      "status": {
+        "draft": "Draft",
+        "processing": "Processing",
+        "ready": "Ready",
+        "error": "Error"
+      },
+      "errors": {
+        "nameRequired": "Template name is required",
+        "createFailed": "Failed to create template",
+        "deleteFailed": "Failed to delete template",
+        "uploadFailed": "Failed to upload document",
+        "onlyOneDocument": "Templates can have only one document"
+      }
+    },
+    "models": {
+      "title": "Models",
+      "description": "Store model documents with cached style analysis. The AI learns tone, structure, and vocabulary from these references.",
+      "addModel": "Add Model",
+      "noModels": "No models yet. Add your first model document for style reference.",
+      "modelName": "Model name",
+      "modelNamePlaceholder": "e.g., Cerere completată model AFIR",
+      "modelDescription": "Description (optional)",
+      "modelDescriptionPlaceholder": "e.g., Completed example for AFIR funding request",
+      "document": "Document",
+      "noDocument": "No document uploaded. Upload a model document.",
+      "replaceDocument": "Replace document",
+      "uploadModel": "Upload model document",
+      "dropFile": "Drop model file here or click to browse",
+      "acceptedFormats": "Accepted: DOCX, PDF",
+      "styleRefBadge": "Style reference only",
+      "usedInProjects": "Used in {count} project(s)",
+      "confirmDelete": "Delete this model? Existing projects that use it will keep their copy.",
+      "status": {
+        "draft": "Draft",
+        "processing": "Processing",
+        "ready": "Ready",
+        "error": "Error"
+      },
+      "errors": {
+        "nameRequired": "Model name is required",
+        "createFailed": "Failed to create model",
+        "deleteFailed": "Failed to delete model",
+        "uploadFailed": "Failed to upload document",
+        "onlyOneDocument": "Models can have only one document"
+      }
+    },
     "entities": {
       "title": "Entities",
       "description": "Manage company and person entities. Each entity can have multiple documents (ID cards, CUI extracts, ONRC certificates, etc.) that provide data for template filling.",
@@ -383,6 +447,23 @@
         "uploadFailed": "Failed to upload document",
         "removeDocFailed": "Failed to remove document"
       }
+    },
+    "picker": {
+      "tabUpload": "Upload new",
+      "tabLibrary": "Choose from library",
+      "selectTemplate": "Select template",
+      "selectModel": "Select model",
+      "selectEntity": "Select entity",
+      "selected": "Selected",
+      "noItems": "No items in library yet",
+      "confirmData": "I confirm that this data is current",
+      "change": "Change",
+      "remove": "Remove"
+    },
+    "nav": {
+      "templates": "Templates",
+      "models": "Models",
+      "entities": "Entities"
     }
   },
   "auth": {

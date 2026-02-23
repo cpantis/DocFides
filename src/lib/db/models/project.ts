@@ -10,6 +10,13 @@ export interface PipelineStageProgress {
   error?: string;
 }
 
+export interface LibraryRef {
+  libraryItemId: Types.ObjectId;
+  name: string;
+  processedData?: Record<string, unknown>;
+  copiedAt: Date;
+}
+
 export interface IProject extends Document {
   userId: string;
   name: string;
@@ -17,6 +24,11 @@ export interface IProject extends Document {
   sourceDocuments: Types.ObjectId[];
   templateDocument?: Types.ObjectId;
   modelDocuments: Types.ObjectId[];
+  libraryRefs?: {
+    template?: LibraryRef;
+    model?: LibraryRef;
+    entities?: LibraryRef[];
+  };
   pipelineJobId?: Types.ObjectId;
   pipelineProgress?: PipelineStageProgress[];
   projectData?: Record<string, unknown>;
@@ -42,6 +54,26 @@ const ProjectSchema = new Schema<IProject>(
     sourceDocuments: [{ type: Schema.Types.ObjectId, ref: 'Document' }],
     templateDocument: { type: Schema.Types.ObjectId, ref: 'Document' },
     modelDocuments: [{ type: Schema.Types.ObjectId, ref: 'Document' }],
+    libraryRefs: {
+      template: {
+        libraryItemId: { type: Schema.Types.ObjectId, ref: 'LibraryItem' },
+        name: { type: String },
+        processedData: { type: Schema.Types.Mixed },
+        copiedAt: { type: Date },
+      },
+      model: {
+        libraryItemId: { type: Schema.Types.ObjectId, ref: 'LibraryItem' },
+        name: { type: String },
+        processedData: { type: Schema.Types.Mixed },
+        copiedAt: { type: Date },
+      },
+      entities: [{
+        libraryItemId: { type: Schema.Types.ObjectId, ref: 'LibraryItem' },
+        name: { type: String },
+        processedData: { type: Schema.Types.Mixed },
+        copiedAt: { type: Date },
+      }],
+    },
     pipelineJobId: { type: Schema.Types.ObjectId, ref: 'PipelineJob' },
     pipelineProgress: [{
       stage: { type: String, required: true },

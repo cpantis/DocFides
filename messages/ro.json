@@ -351,6 +351,70 @@
   },
   "library": {
     "title": "Bibliotecă",
+    "description": "Reutilizează șabloane, modele și entități în mai multe proiecte. Economisește timp prin cache-uirea rezultatelor procesării AI.",
+    "templates": {
+      "title": "Șabloane",
+      "description": "Stochează șabloane de documente cu analiza câmpurilor cache-uită. Reutilizează același șablon în mai multe proiecte fără re-procesare.",
+      "addTemplate": "Adaugă șablon",
+      "noTemplates": "Nu ai încă niciun șablon. Adaugă primul șablon pentru a-l reutiliza în mai multe proiecte.",
+      "templateName": "Numele șablonului",
+      "templateNamePlaceholder": "ex: Cerere finanțare AFIR",
+      "templateDescription": "Descriere (opțional)",
+      "templateDescriptionPlaceholder": "ex: Șablon standard cerere finanțare AFIR",
+      "document": "Document",
+      "noDocument": "Nu a fost încărcat niciun document. Încarcă un șablon DOCX.",
+      "replaceDocument": "Înlocuiește documentul",
+      "uploadTemplate": "Încarcă documentul șablon",
+      "dropFile": "Trage fișierul șablon aici sau click pentru a selecta",
+      "acceptedFormats": "Acceptate: DOCX, PDF",
+      "usedInProjects": "Folosit în {count} proiect(e)",
+      "confirmDelete": "Ștergi acest șablon? Proiectele existente care îl folosesc își vor păstra copia.",
+      "status": {
+        "draft": "Ciornă",
+        "processing": "Se procesează",
+        "ready": "Gata",
+        "error": "Eroare"
+      },
+      "errors": {
+        "nameRequired": "Numele șablonului este obligatoriu",
+        "createFailed": "Crearea șablonului a eșuat",
+        "deleteFailed": "Ștergerea șablonului a eșuat",
+        "uploadFailed": "Încărcarea documentului a eșuat",
+        "onlyOneDocument": "Șabloanele pot avea un singur document"
+      }
+    },
+    "models": {
+      "title": "Modele",
+      "description": "Stochează documente model cu analiza stilului cache-uită. AI-ul învață tonul, structura și vocabularul din aceste referințe.",
+      "addModel": "Adaugă model",
+      "noModels": "Nu ai încă niciun model. Adaugă primul document model ca referință de stil.",
+      "modelName": "Numele modelului",
+      "modelNamePlaceholder": "ex: Cerere completată model AFIR",
+      "modelDescription": "Descriere (opțional)",
+      "modelDescriptionPlaceholder": "ex: Exemplu completat pentru cerere finanțare AFIR",
+      "document": "Document",
+      "noDocument": "Nu a fost încărcat niciun document. Încarcă un document model.",
+      "replaceDocument": "Înlocuiește documentul",
+      "uploadModel": "Încarcă documentul model",
+      "dropFile": "Trage fișierul model aici sau click pentru a selecta",
+      "acceptedFormats": "Acceptate: DOCX, PDF",
+      "styleRefBadge": "Referință de stil doar",
+      "usedInProjects": "Folosit în {count} proiect(e)",
+      "confirmDelete": "Ștergi acest model? Proiectele existente care îl folosesc își vor păstra copia.",
+      "status": {
+        "draft": "Ciornă",
+        "processing": "Se procesează",
+        "ready": "Gata",
+        "error": "Eroare"
+      },
+      "errors": {
+        "nameRequired": "Numele modelului este obligatoriu",
+        "createFailed": "Crearea modelului a eșuat",
+        "deleteFailed": "Ștergerea modelului a eșuat",
+        "uploadFailed": "Încărcarea documentului a eșuat",
+        "onlyOneDocument": "Modelele pot avea un singur document"
+      }
+    },
     "entities": {
       "title": "Entități",
       "description": "Gestionează entitățile (firme, persoane). Fiecare entitate poate avea mai multe documente (cărți de identitate, extras CUI, certificate ONRC etc.) din care se extrag datele pentru completarea șabloanelor.",
@@ -383,6 +447,23 @@
         "uploadFailed": "Încărcarea documentului a eșuat",
         "removeDocFailed": "Ștergerea documentului a eșuat"
       }
+    },
+    "picker": {
+      "tabUpload": "Încarcă nou",
+      "tabLibrary": "Alege din bibliotecă",
+      "selectTemplate": "Selectează șablon",
+      "selectModel": "Selectează model",
+      "selectEntity": "Selectează entitate",
+      "selected": "Selectat",
+      "noItems": "Nu există elemente în bibliotecă",
+      "confirmData": "Confirm că datele sunt actuale",
+      "change": "Schimbă",
+      "remove": "Elimină"
+    },
+    "nav": {
+      "templates": "Șabloane",
+      "models": "Modele",
+      "entities": "Entități"
     }
   },
   "auth": {
