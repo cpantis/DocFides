@@ -219,7 +219,9 @@ export async function POST(
       }
     }
 
-    // If library item has been fully processed, populate project fields from cache
+    // If library item has been fully processed, populate project fields from cache.
+    // Note: Entity items are parse-only (no AI extraction at library time),
+    // so they don't populate projectData — that happens during pipeline extract_analyze.
     const processedData = libraryItem.processedData as Record<string, unknown> | undefined;
     if (libraryItem.status === 'ready' && processedData) {
       if (body.type === 'template' && processedData.type === 'template_schema') {
@@ -227,23 +229,9 @@ export async function POST(
         project.draftPlan = processedData.templateSchema as Record<string, unknown>;
       } else if (body.type === 'model' && processedData.type === 'style_guide') {
         project.modelMap = processedData.styleGuide as Record<string, unknown>;
-      } else if (body.type === 'entity' && processedData.type === 'entity_data') {
-        // Merge entity data into project's projectData
-        const entityData = processedData.entityData as Record<string, unknown>;
-        const existing = (project.projectData ?? {}) as Record<string, unknown>;
-        const existingEntities = (existing.entities ?? {}) as Record<string, unknown>;
-
-        // Entity extraction returns entities with beneficiary/contractor/etc.
-        // Merge them into the project's entity map
-        const extractedEntities = (entityData.entities ?? entityData) as Record<string, unknown>;
-        const merged = { ...existingEntities, ...extractedEntities };
-
-        project.projectData = {
-          ...existing,
-          entities: merged,
-        };
-        project.markModified('projectData');
       }
+      // Entity: no projectData population — AI extraction happens at pipeline time.
+      // The parsed rawText is already stored in Extraction records via copyLibraryDocToProject.
     }
 
     project.markModified('libraryRefs');

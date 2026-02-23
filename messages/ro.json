@@ -371,6 +371,7 @@
       "acceptedFormats": "Acceptate: DOCX, PDF",
       "usedInProjects": "Folosit în {count} proiect(e)",
       "confirmDelete": "Ștergi acest șablon? Proiectele existente care îl folosesc își vor păstra copia.",
+      "retry": "Reîncearcă procesarea",
       "status": {
         "draft": "Ciornă",
         "processing": "Se analizează...",
@@ -411,6 +412,7 @@
       "styleRefBadge": "Referință de stil doar",
       "usedInProjects": "Folosit în {count} proiect(e)",
       "confirmDelete": "Ștergi acest model? Proiectele existente care îl folosesc își vor păstra copia.",
+      "retry": "Reîncearcă procesarea",
       "status": {
         "draft": "Ciornă",
         "processing": "Se analizează...",
@@ -452,6 +454,7 @@
       "usedInProjects": "Folosit în {count} proiect(e)",
       "lastUsed": "Ultima utilizare {date}",
       "confirmDelete": "Ștergi această entitate? Proiectele existente care o folosesc își vor păstra copia.",
+      "retry": "Reîncearcă procesarea",
       "status": {
         "draft": "Ciornă",
         "processing": "Se extrag datele...",
