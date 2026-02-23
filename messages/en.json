@@ -270,7 +270,9 @@
       "title": "AI Processing",
       "steps": {
         "parsing": "Reading documents (OCR, text, tables)...",
+        "parsingSkipped": "Documents already parsed (from library)",
         "extractAnalyzing": "Extracting data, analyzing style, mapping fields...",
+        "extractAnalyzingSkipped": "Data already extracted (from library)",
         "writeVerifying": "Generating text and verifying quality..."
       },
       "complete": "Processing complete!",

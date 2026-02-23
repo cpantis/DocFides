@@ -444,11 +444,20 @@ async function runStage(
     }
 
     case 'write_verify': {
+      // projectData and draftPlan can come from either:
+      // 1. The extract_analyze stage that just ran, or
+      // 2. Pre-populated by library linking (already stored in project fields)
       if (!context.projectData) {
-        throw new Error('Missing projectData for write_verify stage — run extract_analyze first');
+        throw new Error(
+          'Missing projectData for write_verify stage. ' +
+          'Either run extract_analyze first, or link library items with pre-processed data.'
+        );
       }
       if (!context.draftPlan) {
-        throw new Error('Missing field map for write_verify stage — run extract_analyze first');
+        throw new Error(
+          'Missing field map (draftPlan) for write_verify stage. ' +
+          'Either run extract_analyze first, or link a library template with pre-processed data.'
+        );
       }
       return runWriteVerifyAgent({
         projectData: context.projectData,
