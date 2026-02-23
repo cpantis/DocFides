@@ -4,13 +4,12 @@ import useSWR from 'swr';
 import { fetcher } from '@/lib/utils/fetcher';
 
 interface UserStats {
-  credits: {
+  aiCost: {
     total: number;
-    used: number;
-    percentUsed: number;
+    avgPerProject: number;
+    projectsWithCost: number;
   };
   projectsThisMonth: number;
-  avgCostPerDoc: number;
   timeSavedHours: number;
   recentActivity: {
     type: string;

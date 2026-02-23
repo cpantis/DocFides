@@ -2,15 +2,14 @@
 
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
-import { Plus, LayoutDashboard, AlertCircle, Building2 } from 'lucide-react';
+import { Plus, LayoutDashboard, AlertCircle, Building2, LayoutTemplate, BookOpen } from 'lucide-react';
 import { useProjects } from '@/lib/hooks/use-projects';
 import { useUserStats } from '@/lib/hooks/use-user-stats';
 import { ProjectCard } from '@/components/project/ProjectCard';
-import { CreditsMeter } from './CreditsMeter';
+import { AiCostCard } from './AiCostCard';
 import { UsageChart } from './UsageChart';
 import { TimeSavedBadge } from './TimeSavedBadge';
 import { RecentActivity } from './RecentActivity';
-import { AlertBanner } from './AlertBanner';
 import { TagManager } from './TagManager';
 
 export function DashboardContent() {
@@ -68,14 +67,12 @@ export function DashboardContent() {
           </div>
         )}
 
-        {/* Credit alerts */}
-        {stats && <AlertBanner creditPercent={stats.credits.percentUsed} />}
-
         {/* Stats grid */}
         <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <CreditsMeter
-            used={stats?.credits.used ?? 0}
-            total={stats?.credits.total ?? 3}
+          <AiCostCard
+            totalCost={stats?.aiCost.total ?? 0}
+            avgCostPerProject={stats?.aiCost.avgPerProject ?? 0}
+            projectCount={stats?.aiCost.projectsWithCost ?? 0}
           />
           <UsageChart />
           <TimeSavedBadge hours={stats?.timeSavedHours ?? 0} />
@@ -95,23 +92,63 @@ export function DashboardContent() {
 
         {/* Library quick access */}
         <div className="mt-8">
-          <h2 className="font-heading text-lg font-semibold text-gray-900">
-            {tl('title')}
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="font-heading text-lg font-semibold text-gray-900">
+              {tl('title')}
+            </h2>
+            <Link
+              href="/library"
+              className="text-sm font-medium text-primary-600 transition-colors hover:text-primary-700"
+            >
+              {tc('viewAll')}
+            </Link>
+          </div>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Link
+              href="/library/templates"
+              className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:border-primary-200 hover:shadow-md"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
+                <LayoutTemplate className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {tl('nav.templates')}
+                </p>
+                <p className="text-xs text-gray-500 line-clamp-1">
+                  {tl('templates.description')}
+                </p>
+              </div>
+            </Link>
+            <Link
+              href="/library/models"
+              className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:border-primary-200 hover:shadow-md"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50">
+                <BookOpen className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">
+                  {tl('nav.models')}
+                </p>
+                <p className="text-xs text-gray-500 line-clamp-1">
+                  {tl('models.description')}
+                </p>
+              </div>
+            </Link>
             <Link
               href="/library/entities"
               className="flex items-center gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all hover:border-primary-200 hover:shadow-md"
             >
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50">
-                <Building2 className="h-5 w-5 text-primary-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50">
+                <Building2 className="h-5 w-5 text-emerald-600" />
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-900">
-                  {tl('entities.title')}
+                  {tl('nav.entities')}
                 </p>
-                <p className="text-xs text-gray-500">
-                  {tl('entities.description').slice(0, 60)}...
+                <p className="text-xs text-gray-500 line-clamp-1">
+                  {tl('entities.description')}
                 </p>
               </div>
             </Link>

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
-import { connectToDatabase, Project, LibraryItem } from '@/lib/db';
+import { connectToDatabase, Project, LibraryItem, DocumentModel } from '@/lib/db';
+import { saveTempFile, readTempFile } from '@/lib/storage/tmp-storage';
+import type { ILibraryDocument } from '@/lib/db/models/library-item';
+import type { DocumentRole } from '@/lib/db/models/document';
 
 const linkLibrarySchema = z.object({
   type: z.enum(['template', 'model', 'entity']),
@@ -12,6 +15,71 @@ const unlinkLibrarySchema = z.object({
   type: z.enum(['template', 'model', 'entity']),
   libraryItemId: z.string().optional(), // For entities, which is an array
 });
+
+/**
+ * Copy a library document into the project as a real DocumentModel record.
+ * This ensures the pipeline can access it just like a directly uploaded file.
+ */
+async function copyLibraryDocToProject(
+  libDoc: ILibraryDocument,
+  projectId: string,
+  userId: string,
+  role: DocumentRole,
+  tagId?: string
+): Promise<string> {
+  // Generate a project-scoped storage key
+  const timestamp = Date.now();
+  const sanitized = libDoc.originalFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const projectStorageKey = `${userId}/${projectId}/library_${timestamp}_${sanitized}`;
+
+  // Copy the file: try /tmp first, then fall back to MongoDB fileData
+  let fileBuffer: Buffer | null = null;
+  try {
+    fileBuffer = await readTempFile(libDoc.storageKey);
+  } catch {
+    // /tmp miss — try fetching with fileData from library item
+  }
+
+  if (!fileBuffer) {
+    // Fetch the library item again, this time including fileData
+    const libItem = await LibraryItem.findOne({
+      'documents._id': libDoc._id,
+    }).select('+documents.fileData').lean();
+
+    const fullDoc = libItem?.documents.find(
+      (d) => String(d._id) === String(libDoc._id)
+    );
+
+    if (fullDoc?.fileData) {
+      fileBuffer = Buffer.isBuffer(fullDoc.fileData)
+        ? fullDoc.fileData
+        : Buffer.from(fullDoc.fileData as ArrayBuffer);
+    }
+  }
+
+  if (fileBuffer) {
+    await saveTempFile(projectStorageKey, fileBuffer);
+  }
+
+  // Create the DocumentModel record
+  const doc = await DocumentModel.create({
+    projectId,
+    userId,
+    originalFilename: libDoc.originalFilename,
+    role,
+    format: libDoc.format,
+    sizeBytes: libDoc.sizeBytes,
+    sha256: libDoc.sha256,
+    storageKey: projectStorageKey,
+    status: 'uploaded',
+    mimeType: libDoc.mimeType,
+    tagId,
+    // For templates, persist fileData in MongoDB for export resilience
+    ...(role === 'template' && fileBuffer ? { fileData: fileBuffer } : {}),
+  });
+
+  return String(doc._id);
+}
 
 /** POST /api/projects/[id]/library — link a library item to a project (copy on use) */
 export async function POST(
@@ -39,6 +107,14 @@ export async function POST(
       return NextResponse.json({ error: 'Library item not found' }, { status: 404 });
     }
 
+    if (!libraryItem.documents || libraryItem.documents.length === 0) {
+      return NextResponse.json(
+        { error: 'Library item has no documents. Upload a document first.' },
+        { status: 400 }
+      );
+    }
+
+    // Save metadata reference
     const ref = {
       libraryItemId: libraryItem._id,
       name: libraryItem.name,
@@ -50,21 +126,43 @@ export async function POST(
       project.libraryRefs = {};
     }
 
-    if (body.type === 'entity') {
+    // Copy library documents into the project as real DocumentModel records
+    if (body.type === 'template') {
+      project.libraryRefs.template = ref;
+
+      // Remove existing library-sourced template document if re-linking
+      const libDoc = libraryItem.documents[0]!;
+      const docId = await copyLibraryDocToProject(libDoc, id, userId, 'template');
+      project.templateDocument = docId as unknown as typeof project.templateDocument;
+
+    } else if (body.type === 'model') {
+      project.libraryRefs.model = ref;
+
+      // Copy all model documents (up to 2)
+      for (const libDoc of libraryItem.documents) {
+        const docId = await copyLibraryDocToProject(libDoc, id, userId, 'model');
+        project.modelDocuments.push(docId as unknown as typeof project.modelDocuments[0]);
+      }
+
+    } else {
+      // Entity — copy documents as source docs
       if (!project.libraryRefs.entities) {
         project.libraryRefs.entities = [];
       }
-      // Don't add the same entity twice
       const alreadyLinked = project.libraryRefs.entities.some(
         (e) => e.libraryItemId?.toString() === body.libraryItemId
       );
       if (!alreadyLinked) {
         project.libraryRefs.entities.push(ref);
+
+        // Copy entity documents as source documents
+        for (const libDoc of libraryItem.documents) {
+          const docId = await copyLibraryDocToProject(
+            libDoc, id, userId, 'source'
+          );
+          project.sourceDocuments.push(docId as unknown as typeof project.sourceDocuments[0]);
+        }
       }
-    } else if (body.type === 'template') {
-      project.libraryRefs.template = ref;
-    } else {
-      project.libraryRefs.model = ref;
     }
 
     project.markModified('libraryRefs');

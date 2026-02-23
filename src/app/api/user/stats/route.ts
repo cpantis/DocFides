@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { auth, ensureDevUser } from '@/lib/auth/mock-auth';
-import { connectToDatabase, User, Project, Generation } from '@/lib/db';
+import { connectToDatabase, User, Project } from '@/lib/db';
 
 export async function GET() {
   try {
@@ -16,34 +16,36 @@ export async function GET() {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [projectsThisMonth, generations] = await Promise.all([
+    const [projectsThisMonth, projectsWithCost] = await Promise.all([
       Project.countDocuments({
         userId,
         createdAt: { $gte: startOfMonth },
       }),
-      Generation.find({
-        userId,
-        createdAt: { $gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) },
-      }),
+      Project.find(
+        { userId, aiCost: { $gt: 0 } },
+        { aiCost: 1 }
+      ).lean(),
     ]);
 
-    const totalCost = generations.reduce((sum, g) => sum + (g.aiCostUsd ?? 0), 0);
-    const avgCostPerDoc = generations.length > 0 ? totalCost / generations.length : 0;
+    const totalCost = projectsWithCost.reduce(
+      (sum, p) => sum + ((p as Record<string, unknown>).aiCost as number),
+      0
+    );
+    const avgPerProject = projectsWithCost.length > 0
+      ? totalCost / projectsWithCost.length
+      : 0;
 
-    // Estimate time saved: count of accepted fields * 3 min / 60
-    const timeSavedHours = projectsThisMonth * 2.5; // Conservative placeholder
+    // Estimate time saved: count of processed projects * 2.5 hours (conservative)
+    const timeSavedHours = projectsThisMonth * 2.5;
 
     return NextResponse.json({
       data: {
-        credits: {
-          total: user.credits.total,
-          used: user.credits.used,
-          percentUsed: user.credits.total > 0
-            ? Math.round((user.credits.used / user.credits.total) * 100)
-            : 0,
+        aiCost: {
+          total: Math.round(totalCost * 10000) / 10000,
+          avgPerProject: Math.round(avgPerProject * 10000) / 10000,
+          projectsWithCost: projectsWithCost.length,
         },
         projectsThisMonth,
-        avgCostPerDoc: Math.round(avgCostPerDoc * 100) / 100,
         timeSavedHours: Math.round(timeSavedHours * 10) / 10,
         recentActivity: [], // TODO: aggregate from audit log
       },

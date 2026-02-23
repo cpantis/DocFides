@@ -15,6 +15,7 @@
     "error": "Ceva nu a funcționat corect",
     "retry": "Reîncearcă",
     "back": "Înapoi",
+    "viewAll": "Vezi toate",
     "next": "Înainte",
     "confirm": "Confirmă",
     "close": "Închide",
@@ -196,15 +197,14 @@
     "newProject": "Proiect nou",
     "projectsHeading": "Proiecte",
     "noProjects": "Nu ai încă niciun proiect. Creează primul!",
-    "credits": {
-      "title": "Credite",
-      "used": "{used} / {total} utilizate",
-      "warning": "Ai folosit {percent}% din credite",
-      "exhausted": "Credite epuizate. Fă upgrade pentru a continua exportul."
+    "aiCost": {
+      "title": "Cost procesare AI",
+      "total": "Total cheltuit (USD)",
+      "avgPerProject": "Medie per proiect",
+      "projectsProcessed": "Proiecte procesate"
     },
     "stats": {
       "projects": "Proiecte luna aceasta",
-      "costPerDoc": "Cost mediu/document",
       "timeSaved": "Ore economisite",
       "recentActivity": "Activitate recentă"
     },
