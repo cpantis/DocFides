@@ -71,12 +71,13 @@ export async function preprocessForOcr(
   pipeline = pipeline.png();
 
   const processedBuffer = await pipeline.toBuffer();
-  const processedMeta = await sharp(processedBuffer).metadata();
 
+  // Calculate output dimensions from the upscale factor instead of re-reading metadata
+  const scale = (dpi > (metadata.density ?? 72) && !options?.skipUpscale) ? TARGET_DPI / (metadata.density ?? 72) : 1;
   return {
     buffer: processedBuffer,
-    width: processedMeta.width ?? inputWidth,
-    height: processedMeta.height ?? inputHeight,
+    width: Math.round(inputWidth * scale),
+    height: Math.round(inputHeight * scale),
     dpi,
     warnings,
   };

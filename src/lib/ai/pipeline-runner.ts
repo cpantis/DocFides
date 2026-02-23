@@ -241,18 +241,34 @@ export async function runPipelineBackground(
 async function determineRequiredStages(
   project: { _id: unknown; projectData?: unknown; templateSchema?: unknown; draftPlan?: unknown }
 ): Promise<PipelineStage[]> {
-  const { DocumentModel } = await import('@/lib/db');
+  const { DocumentModel, Extraction } = await import('@/lib/db');
   const projectId = String(project._id);
 
-  // Check if there are unparsed documents that need the parser
-  const unparsedCount = await DocumentModel.countDocuments({
+  // Check if there are unparsed documents that need the parser.
+  // BUT: documents with status 'uploaded' that already have Extraction records
+  // (from library linking) should be auto-promoted to 'extracted' first.
+  const unparsedDocs = await DocumentModel.find({
     projectId,
     status: { $in: ['uploaded', 'processing', 'failed'] },
   });
 
-  if (unparsedCount > 0) {
+  let trueUnparsedCount = 0;
+  for (const doc of unparsedDocs) {
+    const docId = String(doc._id);
+    const hasExtraction = await Extraction.exists({ documentId: docId });
+    if (hasExtraction) {
+      // This document has a pre-existing Extraction record (from library linking)
+      // Promote it to 'extracted' so the pipeline can use it directly
+      await DocumentModel.findByIdAndUpdate(docId, { status: 'extracted' });
+      console.log(`[Pipeline] Auto-promoted ${doc.originalFilename} to 'extracted' (has Extraction record)`);
+    } else {
+      trueUnparsedCount++;
+    }
+  }
+
+  if (trueUnparsedCount > 0) {
     // Some documents haven't been parsed yet — run full pipeline
-    console.log(`[Pipeline] ${unparsedCount} unparsed documents found — running full pipeline`);
+    console.log(`[Pipeline] ${trueUnparsedCount} unparsed documents found — running full pipeline`);
     return [...PIPELINE_STAGES_ORDER];
   }
 
@@ -261,6 +277,8 @@ async function determineRequiredStages(
   const hasProjectData = project.projectData && Object.keys(project.projectData as Record<string, unknown>).length > 0;
   const hasTemplateSchema = project.templateSchema && Object.keys(project.templateSchema as Record<string, unknown>).length > 0;
   const hasDraftPlan = project.draftPlan && Object.keys(project.draftPlan as Record<string, unknown>).length > 0;
+
+  console.log(`[Pipeline] Pre-processed data check: projectData=${!!hasProjectData}, templateSchema=${!!hasTemplateSchema}, draftPlan=${!!hasDraftPlan}`);
 
   if (hasProjectData && hasTemplateSchema && hasDraftPlan) {
     // All data is pre-populated from library — skip directly to write_verify
@@ -275,5 +293,6 @@ async function determineRequiredStages(
   }
 
   // No pre-processed data — run full pipeline
+  console.log('[Pipeline] No pre-processed data detected — running full pipeline');
   return [...PIPELINE_STAGES_ORDER];
 }

@@ -7,6 +7,8 @@ import {
   FileText,
   Check,
   X,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import type { LibraryItemData } from '@/lib/hooks/use-library';
@@ -160,31 +162,57 @@ function LibraryList({
 
   return (
     <div className="space-y-2">
-      {readyItems.map((item) => (
-        <button
-          key={item._id}
-          onClick={() => onSelect(item)}
-          className="flex w-full items-center gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-left transition-all hover:border-primary-200 hover:shadow-sm"
-        >
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-gray-900">{item.name}</p>
-            {item.description && (
-              <p className="truncate text-xs text-gray-500">{item.description}</p>
+      {readyItems.map((item) => {
+        const isProcessing = item.status === 'processing';
+        const isError = item.status === 'error';
+        const isReady = item.status === 'ready';
+
+        return (
+          <button
+            key={item._id}
+            onClick={() => isReady ? onSelect(item) : undefined}
+            disabled={!isReady}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all',
+              isReady && 'border-gray-200 bg-white hover:border-primary-200 hover:shadow-sm',
+              isProcessing && 'cursor-not-allowed border-blue-100 bg-blue-50/50 opacity-75',
+              isError && 'cursor-not-allowed border-red-100 bg-red-50/50 opacity-75',
             )}
-            {item.documents[0] && (
-              <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
-                <FileText className="h-3 w-3" />
-                <span>{item.documents[0].originalFilename}</span>
-                <span>&middot;</span>
-                <span>{(item.documents[0].sizeBytes / (1024 * 1024)).toFixed(1)} MB</span>
-              </div>
+          >
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-gray-900">{item.name}</p>
+              {item.description && (
+                <p className="truncate text-xs text-gray-500">{item.description}</p>
+              )}
+              {item.documents[0] && (
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
+                  <FileText className="h-3 w-3" />
+                  <span>{item.documents[0].originalFilename}</span>
+                  <span>&middot;</span>
+                  <span>{(item.documents[0].sizeBytes / (1024 * 1024)).toFixed(1)} MB</span>
+                </div>
+              )}
+            </div>
+            {isProcessing && (
+              <span className="flex flex-shrink-0 items-center gap-1 text-xs font-medium text-blue-600">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                {tp('processing')}
+              </span>
             )}
-          </div>
-          <span className="flex-shrink-0 text-xs font-medium text-primary-600">
-            {tp(`select${type.charAt(0).toUpperCase() + type.slice(1)}` as 'selectTemplate' | 'selectModel' | 'selectEntity')}
-          </span>
-        </button>
-      ))}
+            {isError && (
+              <span className="flex flex-shrink-0 items-center gap-1 text-xs font-medium text-red-500">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {tp('error')}
+              </span>
+            )}
+            {isReady && (
+              <span className="flex-shrink-0 text-xs font-medium text-primary-600">
+                {tp(`select${type.charAt(0).toUpperCase() + type.slice(1)}` as 'selectTemplate' | 'selectModel' | 'selectEntity')}
+              </span>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

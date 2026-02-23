@@ -484,7 +484,9 @@
       "noItems": "No items in library yet",
       "confirmData": "I confirm that this data is current",
       "change": "Change",
-      "remove": "Remove"
+      "remove": "Remove",
+      "processing": "Processing...",
+      "error": "Error"
     },
     "nav": {
       "templates": "Templates",

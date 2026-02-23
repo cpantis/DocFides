@@ -484,7 +484,9 @@
       "noItems": "Nu există elemente în bibliotecă",
       "confirmData": "Confirm că datele sunt actuale",
       "change": "Schimbă",
-      "remove": "Elimină"
+      "remove": "Elimină",
+      "processing": "Se procesează...",
+      "error": "Eroare"
     },
     "nav": {
       "templates": "Șabloane",

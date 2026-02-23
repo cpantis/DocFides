@@ -64,8 +64,9 @@ async function copyLibraryDocToProject(
     await saveTempFile(projectStorageKey, fileBuffer);
   }
 
-  // Create the DocumentModel record — mark as 'extracted' if we have rawText from library
-  const isProcessed = libDoc.status === 'extracted' && rawText;
+  // Create the DocumentModel record — mark as 'extracted' if we have rawText from library.
+  // Only check rawText (not libDoc.status) — if we have pre-parsed text, the document is ready.
+  const isProcessed = !!rawText;
   const doc = await DocumentModel.create({
     projectId,
     userId,
@@ -136,6 +137,19 @@ export async function POST(
       );
     }
 
+    // Block linking of library items that are still being processed
+    if (libraryItem.status === 'processing') {
+      return NextResponse.json(
+        { error: 'Library item is still being processed. Please wait until processing is complete.' },
+        { status: 409 }
+      );
+    }
+
+    // Warn if library item had a processing error (allow linking but without cached data)
+    if (libraryItem.status === 'error') {
+      console.warn(`[PROJECT_LIBRARY_LINK] Linking library item ${body.libraryItemId} with error status — cached data unavailable`);
+    }
+
     // Save metadata reference
     const ref = {
       libraryItemId: libraryItem._id,
@@ -156,6 +170,8 @@ export async function POST(
       filename: string; rawText: string;
       tables: Array<{ headers: string[]; rows: string[][]; confidence: number }>;
     }> | undefined;
+
+    console.log(`[PROJECT_LIBRARY_LINK] Linking ${body.type} "${libraryItem.name}" (status: ${libraryItem.status}, docs: ${libraryItem.documents.length}, cachedRawText: ${!!cachedRawText}, cachedDocs: ${cachedDocuments?.length ?? 0})`);
 
     // Copy library documents into the project as real DocumentModel records
     if (body.type === 'template') {

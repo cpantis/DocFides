@@ -21,13 +21,13 @@ export async function extractFromDocx(
 
   const mammoth = await import('mammoth');
 
-  // Extract raw text for the AI pipeline
-  const textResult = await mammoth.extractRawText({ buffer });
-  const rawText = textResult.value ?? '';
-
-  // Extract HTML for structural information (headings, lists, tables)
+  // Single mammoth pass: extract HTML for both structure and raw text.
+  // Avoids parsing the DOCX twice (extractRawText + convertToHtml were redundant).
   const htmlResult = await mammoth.convertToHtml({ buffer });
   const html = htmlResult.value ?? '';
+
+  // Derive rawText by stripping HTML tags (faster than a second mammoth pass)
+  const rawText = stripHtml(html).replace(/\n{3,}/g, '\n\n').trim();
 
   // Parse HTML for structural blocks
   const structuralBlocks = parseHtmlStructure(html, filename);

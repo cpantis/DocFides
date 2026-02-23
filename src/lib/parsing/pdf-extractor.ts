@@ -112,15 +112,19 @@ export async function extractFromPdf(
     let ocrBlocks: ExtractionBlock[] = [];
     let ocrTables: TableData[] = [];
     let ocrConfidence = 0;
+    let pageImage: Buffer | null = null;
 
     try {
       const { pdfPageToImage } = await import('./preprocessor');
       const { recognizeImage } = await import('./ocr');
 
-      const pageImage = await pdfPageToImage(buffer, page);
+      // Convert page to image once and cache for potential Vision fallback
+      pageImage = await pdfPageToImage(buffer, page);
       const ocrResult = await recognizeImage(pageImage, {
         page: pageNum,
         source: 'sharp-tesseract',
+        // Skip preprocessing — pdfPageToImage already outputs a clean 300 DPI PNG
+        skipPreprocess: true,
       });
 
       ocrText = ocrResult.rawText.trim();
@@ -148,8 +152,11 @@ export async function extractFromPdf(
     // 2c. OCR also insufficient — Vision API fallback on this single page
     if (!options?.skipVision && process.env.ANTHROPIC_API_KEY) {
       try {
-        const { pdfPageToImage } = await import('./preprocessor');
-        const pageImage = await pdfPageToImage(buffer, page);
+        // Reuse cached page image instead of converting again
+        if (!pageImage) {
+          const { pdfPageToImage } = await import('./preprocessor');
+          pageImage = await pdfPageToImage(buffer, page);
+        }
 
         console.log(
           `[Parser] Page ${pageNum}: vision_fallback (OCR returned ${ocrText.length} chars, sent to Vision)`
