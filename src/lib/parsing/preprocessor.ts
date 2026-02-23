@@ -40,19 +40,31 @@ export async function preprocessForOcr(
 
   let pipeline = sharp(imageBuffer);
 
-  // Upscale low-DPI images to TARGET_DPI
+  // Upscale low-DPI images to TARGET_DPI (with memory guard)
+  const MAX_UPSCALE_PIXELS = 100_000_000; // ~400MB RGBA — safe for most containers
   if (dpi < MIN_OCR_DPI && !options?.skipUpscale) {
     const scale = TARGET_DPI / dpi;
-    pipeline = pipeline.resize({
-      width: Math.round(inputWidth * scale),
-      height: Math.round(inputHeight * scale),
-      fit: 'fill',
-      kernel: sharp.kernel.lanczos3,
-    });
-    warnings.push(
-      `Low resolution detected (${dpi} DPI). Upscaled to ~${TARGET_DPI} DPI. Re-scanning at higher resolution recommended.`
-    );
-    dpi = TARGET_DPI;
+    const outWidth = Math.round(inputWidth * scale);
+    const outHeight = Math.round(inputHeight * scale);
+    const estimatedPixels = outWidth * outHeight;
+
+    if (estimatedPixels > MAX_UPSCALE_PIXELS) {
+      warnings.push(
+        `Low resolution (${dpi} DPI) but image too large to upscale safely ` +
+        `(${inputWidth}x${inputHeight} → ${outWidth}x${outHeight}). Skipping upscale.`
+      );
+    } else {
+      pipeline = pipeline.resize({
+        width: outWidth,
+        height: outHeight,
+        fit: 'fill',
+        kernel: sharp.kernel.lanczos3,
+      });
+      warnings.push(
+        `Low resolution detected (${dpi} DPI). Upscaled to ~${TARGET_DPI} DPI. Re-scanning at higher resolution recommended.`
+      );
+      dpi = TARGET_DPI;
+    }
   }
 
   // Convert to grayscale

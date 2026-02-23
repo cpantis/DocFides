@@ -115,6 +115,7 @@ export async function runTemplateAgent(input: string | TemplateAgentInput): Prom
     {
       model: AGENT_MODELS.template,
       max_tokens: 8192,
+      temperature: 0.3, // Low temperature for deterministic field identification
       system: TEMPLATE_SYSTEM_PROMPT,
       tools: [
         {

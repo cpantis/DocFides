@@ -56,8 +56,26 @@ export async function recognizeImage(
     warnings.push(...preprocessed.warnings);
   }
 
-  const worker = await getWorker();
-  const result = await worker.recognize(processedBuffer);
+  let worker = await getWorker();
+
+  // Wrap OCR in a timeout to prevent indefinite hangs on malformed images
+  const OCR_TIMEOUT_MS = 60_000; // 60 seconds
+  let result;
+  try {
+    result = await Promise.race([
+      worker.recognize(processedBuffer),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`OCR timed out after ${OCR_TIMEOUT_MS / 1000}s`)), OCR_TIMEOUT_MS)
+      ),
+    ]);
+  } catch (ocrErr) {
+    // On timeout or crash, destroy the worker so next call gets a fresh one
+    try {
+      await worker.terminate();
+    } catch { /* ignore cleanup errors */ }
+    workerInstance = null;
+    throw ocrErr;
+  }
 
   const blocks: ExtractionBlock[] = [];
   let blockIndex = 0;

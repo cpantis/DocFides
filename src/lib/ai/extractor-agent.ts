@@ -23,6 +23,7 @@ export async function runExtractorAgent(input: ExtractorInput): Promise<AgentRes
     {
       model: AGENT_MODELS.extractor,
       max_tokens: 8192,
+      temperature: 0.3, // Low temperature for deterministic extraction
       system: EXTRACTOR_SYSTEM_PROMPT,
       tools: [
         {

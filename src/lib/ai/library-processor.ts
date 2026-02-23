@@ -50,8 +50,10 @@ export async function processLibraryItem(itemId: string): Promise<void> {
     return;
   }
 
-  // Mark as processing
+  // Mark as processing with metadata
   item.status = 'processing';
+  item.processingStartedAt = new Date();
+  item.processingAttempts = (item.processingAttempts ?? 0) + 1;
   for (const doc of item.documents) {
     if (doc.status === 'uploaded') {
       doc.status = 'processing';
@@ -74,6 +76,7 @@ export async function processLibraryItem(itemId: string): Promise<void> {
 
     // Mark as ready
     item.status = 'ready';
+    item.processingCompletedAt = new Date();
     for (const doc of item.documents) {
       if (doc.status === 'processing') {
         doc.status = 'extracted';
@@ -81,16 +84,22 @@ export async function processLibraryItem(itemId: string): Promise<void> {
     }
     await item.save();
 
-    console.log(`[LibraryProcessor] Successfully processed ${item.type} "${item.name}"`);
+    const durationMs = item.processingCompletedAt.getTime() - (item.processingStartedAt?.getTime() ?? 0);
+    console.log(
+      `[LibraryProcessor] Successfully processed ${item.type} "${item.name}" ` +
+      `in ${(durationMs / 1000).toFixed(1)}s (attempt ${item.processingAttempts})`
+    );
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error(`[LibraryProcessor] Failed to process ${item.type} "${item.name}":`, errMsg);
 
     item.status = 'error';
+    item.processingCompletedAt = new Date();
     item.processedData = { error: errMsg } as Record<string, unknown>;
     for (const doc of item.documents) {
       if (doc.status === 'processing') {
         doc.status = 'failed';
+        doc.failureReason = errMsg;
       }
     }
     await item.save();
@@ -234,11 +243,10 @@ async function processEntity(item: ILibraryItem): Promise<void> {
       if (parsed.rawText && parsed.rawText.length >= 10) {
         parsedDocs.push(parsed);
       } else {
-        failedDocs.push({
-          filename: doc.originalFilename,
-          error: `Insufficient text extracted (${parsed.rawText?.length ?? 0} chars)`,
-        });
+        const reason = `Insufficient text extracted (${parsed.rawText?.length ?? 0} chars)`;
+        failedDocs.push({ filename: doc.originalFilename, error: reason });
         doc.status = 'failed';
+        doc.failureReason = reason;
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -248,6 +256,7 @@ async function processEntity(item: ILibraryItem): Promise<void> {
       );
       failedDocs.push({ filename: doc.originalFilename, error: errMsg });
       doc.status = 'failed';
+      doc.failureReason = errMsg;
     }
   }
 

@@ -63,6 +63,7 @@ export async function extractWithAI(
     {
       model: AGENT_MODELS.extractor,
       max_tokens: 16384,
+      temperature: 0.3,
       system: OCR_SYSTEM_PROMPT,
       tools: [
         {

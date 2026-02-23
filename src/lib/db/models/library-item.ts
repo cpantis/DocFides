@@ -16,6 +16,7 @@ export interface ILibraryDocument {
   storageKey: string;
   mimeType: string;
   status: 'uploaded' | 'processing' | 'extracted' | 'failed';
+  failureReason?: string;
   extractionBlocks?: Record<string, unknown>[];
   fileData?: Buffer;
   uploadedAt: Date;
@@ -29,6 +30,9 @@ export interface ILibraryItem extends Document {
   documents: ILibraryDocument[];
   processedData?: Record<string, unknown>;
   status: LibraryItemStatus;
+  processingStartedAt?: Date;
+  processingCompletedAt?: Date;
+  processingAttempts: number;
   usageCount: number;
   lastUsedAt?: Date;
   createdAt: Date;
@@ -48,6 +52,7 @@ const LibraryDocumentSchema = new Schema<ILibraryDocument>(
       enum: ['uploaded', 'processing', 'extracted', 'failed'],
       default: 'uploaded',
     },
+    failureReason: { type: String },
     extractionBlocks: [{ type: Schema.Types.Mixed }],
     fileData: { type: Buffer, select: false },
     uploadedAt: { type: Date, default: Date.now },
@@ -68,6 +73,9 @@ const LibraryItemSchema = new Schema<ILibraryItem>(
       enum: ['draft', 'processing', 'ready', 'error'],
       default: 'draft',
     },
+    processingStartedAt: { type: Date },
+    processingCompletedAt: { type: Date },
+    processingAttempts: { type: Number, default: 0 },
     usageCount: { type: Number, default: 0 },
     lastUsedAt: { type: Date },
   },
