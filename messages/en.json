@@ -197,15 +197,14 @@
     "newProject": "New Project",
     "projectsHeading": "Projects",
     "noProjects": "No projects yet. Create your first one!",
-    "credits": {
-      "title": "Credits",
-      "used": "{used} / {total} used",
-      "warning": "You've used {percent}% of your credits",
-      "exhausted": "Credits exhausted. Upgrade to continue exporting."
+    "aiCost": {
+      "title": "AI Processing Cost",
+      "total": "Total spent (USD)",
+      "avgPerProject": "Avg. per project",
+      "projectsProcessed": "Projects processed"
     },
     "stats": {
       "projects": "Projects this month",
-      "costPerDoc": "Avg. cost/document",
       "timeSaved": "Hours saved",
       "recentActivity": "Recent Activity"
     },

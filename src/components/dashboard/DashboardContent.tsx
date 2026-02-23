@@ -6,11 +6,10 @@ import { Plus, LayoutDashboard, AlertCircle, Building2, LayoutTemplate, BookOpen
 import { useProjects } from '@/lib/hooks/use-projects';
 import { useUserStats } from '@/lib/hooks/use-user-stats';
 import { ProjectCard } from '@/components/project/ProjectCard';
-import { CreditsMeter } from './CreditsMeter';
+import { AiCostCard } from './AiCostCard';
 import { UsageChart } from './UsageChart';
 import { TimeSavedBadge } from './TimeSavedBadge';
 import { RecentActivity } from './RecentActivity';
-import { AlertBanner } from './AlertBanner';
 import { TagManager } from './TagManager';
 
 export function DashboardContent() {
@@ -68,14 +67,12 @@ export function DashboardContent() {
           </div>
         )}
 
-        {/* Credit alerts */}
-        {stats && <AlertBanner creditPercent={stats.credits.percentUsed} />}
-
         {/* Stats grid */}
         <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          <CreditsMeter
-            used={stats?.credits.used ?? 0}
-            total={stats?.credits.total ?? 3}
+          <AiCostCard
+            totalCost={stats?.aiCost.total ?? 0}
+            avgCostPerProject={stats?.aiCost.avgPerProject ?? 0}
+            projectCount={stats?.aiCost.projectsWithCost ?? 0}
           />
           <UsageChart />
           <TimeSavedBadge hours={stats?.timeSavedHours ?? 0} />
