@@ -1,6 +1,6 @@
 import { AGENT_MODELS } from '@/types/pipeline';
 import { MODEL_SYSTEM_PROMPT } from './prompts/model';
-import { callAgentWithRetry, type AgentResult } from './client';
+import { callGeminiWithRetry, type AgentResult } from './gemini-client';
 
 export interface ModelAgentInput {
   documents: {
@@ -14,12 +14,13 @@ export async function runModelAgent(input: ModelAgentInput): Promise<AgentResult
     .map((d) => `--- Model Document: ${d.filename} ---\n${d.content}`)
     .join('\n\n');
 
-  const result = await callAgentWithRetry(
+  const result = await callGeminiWithRetry(
     {
       model: AGENT_MODELS.model,
-      max_tokens: 8192,
-      temperature: 0.3, // Low temperature for consistent style extraction
       system: MODEL_SYSTEM_PROMPT,
+      userMessage: `Analyze the following model documents for STYLE, TONE, and STRUCTURE ONLY. Extract rhetorical patterns and domain vocabulary. Do NOT extract any factual data (names, dates, amounts, CUI, etc.).\n\n${documentsText}`,
+      temperature: 0.3,
+      maxOutputTokens: 8192,
       tools: [
         {
           name: 'save_model_map',
@@ -48,12 +49,6 @@ export async function runModelAgent(input: ModelAgentInput): Promise<AgentResult
           },
         },
       ],
-      messages: [
-        {
-          role: 'user',
-          content: `Analyze the following model documents for STYLE, TONE, and STRUCTURE ONLY. Extract rhetorical patterns and domain vocabulary. Do NOT extract any factual data (names, dates, amounts, CUI, etc.).\n\n${documentsText}`,
-        },
-      ],
     },
     'save_model_map'
   );
@@ -76,7 +71,6 @@ export async function runModelAgent(input: ModelAgentInput): Promise<AgentResult
 
   if (warnings.length > 0) {
     console.warn('[MODEL_AGENT] Data leakage warnings:', warnings);
-    // Add warnings to output for downstream visibility
     result.output['_dataLeakageWarnings'] = warnings;
   }
 

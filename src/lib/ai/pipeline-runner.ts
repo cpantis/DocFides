@@ -1,6 +1,6 @@
 /**
  * Background pipeline runner that updates stage progress in MongoDB.
- * Requires ANTHROPIC_API_KEY to be set — fails clearly if AI is unavailable.
+ * Requires GOOGLE_AI_API_KEY to be set — fails clearly if AI is unavailable.
  */
 
 import { PIPELINE_STAGES_ORDER, type PipelineStage } from '@/types/pipeline';
@@ -35,24 +35,24 @@ async function updateStageProgress(
 }
 
 /**
- * Validate that ANTHROPIC_API_KEY is configured and not a placeholder.
+ * Validate that GOOGLE_AI_API_KEY is configured and not a placeholder.
  * Returns { valid: true } or { valid: false, reason: string }.
  */
-function validateAnthropicKey(): { valid: boolean; reason?: string } {
-  const key = process.env.ANTHROPIC_API_KEY;
+function validateGoogleKey(): { valid: boolean; reason?: string } {
+  const key = process.env.GOOGLE_AI_API_KEY;
 
   if (!key || key.trim().length === 0) {
-    return { valid: false, reason: 'ANTHROPIC_API_KEY is not set in environment variables' };
+    return { valid: false, reason: 'GOOGLE_AI_API_KEY is not set in environment variables' };
   }
 
   if (key.length < 10) {
-    return { valid: false, reason: 'ANTHROPIC_API_KEY appears to be too short — check your .env.local' };
+    return { valid: false, reason: 'GOOGLE_AI_API_KEY appears to be too short — check your .env.local' };
   }
 
-  const placeholders = ['LIPSESTE', 'MISSING', 'PLACEHOLDER', 'your-key', 'sk-ant-xxx'];
+  const placeholders = ['LIPSESTE', 'MISSING', 'PLACEHOLDER', 'your-key', 'xxx'];
   const found = placeholders.find((p) => key.includes(p));
   if (found) {
-    return { valid: false, reason: `ANTHROPIC_API_KEY contains placeholder value "${found}" — set a real API key in .env.local` };
+    return { valid: false, reason: `GOOGLE_AI_API_KEY contains placeholder value "${found}" — set a real API key in .env.local` };
   }
 
   return { valid: true };
@@ -122,7 +122,7 @@ export async function runPipelineBackground(
   }
 
   // Pre-flight check 1: Validate API key
-  const keyCheck = validateAnthropicKey();
+  const keyCheck = validateGoogleKey();
   if (!keyCheck.valid) {
     await failPipelineEarly(projectId, userId, keyCheck.reason!);
     return;
@@ -182,15 +182,14 @@ export async function runPipelineBackground(
 
       // Provide user-friendly error messages
       let userMessage = errorMsg;
-      const status = (error as { status?: number }).status;
-      if (status === 401) {
-        userMessage = 'ANTHROPIC_API_KEY is invalid or expired. Check your API key in .env.local';
-      } else if (status === 429) {
-        userMessage = 'Anthropic API rate limit exceeded. Please wait a few minutes and retry.';
-      } else if (status === 529) {
-        userMessage = 'Anthropic API is temporarily overloaded. Please retry later.';
+      if (errorMsg.includes('429') || errorMsg.includes('rate') || errorMsg.includes('quota')) {
+        userMessage = 'Google AI API rate limit or quota exceeded. Please wait a few minutes and retry.';
+      } else if (errorMsg.includes('403') || errorMsg.includes('permission')) {
+        userMessage = 'GOOGLE_AI_API_KEY does not have permission. Check your API key and billing in Google AI Studio.';
+      } else if (errorMsg.includes('GOOGLE_AI_API_KEY')) {
+        userMessage = 'GOOGLE_AI_API_KEY is invalid or expired. Check your API key in .env.local';
       } else if (errorMsg.includes('fetch failed') || errorMsg.includes('ENOTFOUND') || errorMsg.includes('ECONNREFUSED')) {
-        userMessage = 'Cannot connect to Anthropic API. Check your internet connection.';
+        userMessage = 'Cannot connect to Google AI API. Check your internet connection.';
       } else if (errorMsg.includes('No extracted')) {
         userMessage = `${errorMsg}. Make sure documents were uploaded and extracted successfully before processing.`;
       }

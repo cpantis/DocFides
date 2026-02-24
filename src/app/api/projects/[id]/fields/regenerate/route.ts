@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth/mock-auth';
 import { z } from 'zod';
 import { connectToDatabase, Project, Generation, Audit } from '@/lib/db';
-import { callAgentWithRetry } from '@/lib/ai/client';
+import { callGeminiWithRetry } from '@/lib/ai/gemini-client';
 import { AGENT_MODELS } from '@/types/pipeline';
 import { WRITE_VERIFY_SYSTEM_PROMPT } from '@/lib/ai/prompts/write-verify';
 
@@ -12,7 +12,7 @@ const regenerateSchema = z.object({
 
 /**
  * POST /api/projects/[id]/fields/regenerate
- * Regenerate a single field using the Writing Agent.
+ * Regenerate a single field using the Writing Agent (Gemini).
  */
 export async function POST(
   req: NextRequest,
@@ -55,11 +55,23 @@ export async function POST(
       : 'projectData';
 
     // Call Writing Agent for single field regeneration
-    const result = await callAgentWithRetry(
+    const result = await callGeminiWithRetry(
       {
         model: AGENT_MODELS.write_verify,
-        max_tokens: 4096,
         system: WRITE_VERIFY_SYSTEM_PROMPT,
+        userMessage: `Regenerate ONLY the following field. Use ONLY factual data from project_data (never from model documents).
+
+Field: ${body.fieldId}
+Hint: ${fieldHint}
+Data source: ${JSON.stringify(dataSource)}
+
+Project data:
+${JSON.stringify(projectData, null, 2)}
+
+${modelMap ? `Style reference (for tone/style ONLY, NOT for facts):\n${JSON.stringify(modelMap, null, 2)}` : ''}
+
+Generate a fresh, accurate value for this field. Follow Romanian formatting conventions (DD.MM.YYYY for dates, dot-separated thousands for amounts).`,
+        maxOutputTokens: 4096,
         tools: [
           {
             name: 'save_field_completion',
@@ -72,23 +84,6 @@ export async function POST(
               },
               required: ['value'],
             },
-          },
-        ],
-        messages: [
-          {
-            role: 'user',
-            content: `Regenerate ONLY the following field. Use ONLY factual data from project_data (never from model documents).
-
-Field: ${body.fieldId}
-Hint: ${fieldHint}
-Data source: ${JSON.stringify(dataSource)}
-
-Project data:
-${JSON.stringify(projectData, null, 2)}
-
-${modelMap ? `Style reference (for tone/style ONLY, NOT for facts):\n${JSON.stringify(modelMap, null, 2)}` : ''}
-
-Generate a fresh, accurate value for this field. Follow Romanian formatting conventions (DD.MM.YYYY for dates, dot-separated thousands for amounts).`,
           },
         ],
       },

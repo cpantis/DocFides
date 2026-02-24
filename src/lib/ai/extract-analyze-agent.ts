@@ -1,7 +1,7 @@
 /**
- * Agent 1 — Extract & Analyze (Sonnet 4.5)
+ * Agent 1 — Extract & Analyze (Gemini 2.5 Pro)
  *
- * Combines 4 old agents into a single API call:
+ * Combines 4 logical stages into a single API call:
  *   - Extractor (factual data from source docs)
  *   - Model (style from model docs)
  *   - Template (field identification)
@@ -13,7 +13,7 @@
 
 import { AGENT_MODELS } from '@/types/pipeline';
 import { EXTRACT_ANALYZE_SYSTEM_PROMPT } from './prompts/extract-analyze';
-import { callAgentWithRetry, type AgentResult } from './client';
+import { callGeminiWithRetry, type AgentResult } from './gemini-client';
 
 export interface ExtractAnalyzeInput {
   sourceDocs: {
@@ -61,12 +61,13 @@ export async function runExtractAnalyzeAgent(input: ExtractAnalyzeInput): Promis
     `Use save_extract_analyze to return the combined result.\n\n` +
     `=== SOURCE DOCUMENTS ===\n\n${sourceSection}${modelSection}${templateSection}`;
 
-  const result = await callAgentWithRetry(
+  const result = await callGeminiWithRetry(
     {
       model: AGENT_MODELS.extract_analyze,
-      max_tokens: 16384,
-      temperature: 0.3,
       system: EXTRACT_ANALYZE_SYSTEM_PROMPT,
+      userMessage,
+      temperature: 0.3,
+      maxOutputTokens: 16384,
       tools: [
         {
           name: 'save_extract_analyze',
@@ -177,12 +178,6 @@ export async function runExtractAnalyzeAgent(input: ExtractAnalyzeInput): Promis
             },
             required: ['project_data', 'style_guide', 'field_map'],
           },
-        },
-      ],
-      messages: [
-        {
-          role: 'user',
-          content: userMessage,
         },
       ],
     },

@@ -1,8 +1,8 @@
 /**
- * Agent 2 — Write & Verify (Sonnet 4.5)
+ * Agent 2 — Write & Verify (Gemini 2.5 Pro)
  *
- * Combines 2 old agents into a single API call:
- *   - Writing Agent (3-pass text generation → now single pass)
+ * Combines 2 logical stages into a single API call:
+ *   - Writing Agent (text generation)
  *   - Verification Agent (quality checks)
  *
  * Input: Agent 1 JSON (project_data + style_guide + field_map)
@@ -11,7 +11,7 @@
 
 import { AGENT_MODELS } from '@/types/pipeline';
 import { WRITE_VERIFY_SYSTEM_PROMPT } from './prompts/write-verify';
-import { callAgentWithRetry, type AgentResult } from './client';
+import { callGeminiWithRetry, type AgentResult } from './gemini-client';
 
 export interface WriteVerifyInput {
   projectData: Record<string, unknown>;
@@ -40,11 +40,13 @@ export async function runWriteVerifyAgent(input: WriteVerifyInput): Promise<Agen
     `Field Map (template fields with classification and data sources):\n${JSON.stringify(input.fieldMap, null, 2)}` +
     `${styleSection}`;
 
-  return callAgentWithRetry(
+  return callGeminiWithRetry(
     {
       model: AGENT_MODELS.write_verify,
-      max_tokens: 16384,
       system: WRITE_VERIFY_SYSTEM_PROMPT,
+      userMessage,
+      temperature: 0.4,
+      maxOutputTokens: 16384,
       tools: [
         {
           name: 'save_write_verify',
@@ -102,12 +104,6 @@ export async function runWriteVerifyAgent(input: WriteVerifyInput): Promise<Agen
             },
             required: ['fields', 'quality_scores', 'global_score'],
           },
-        },
-      ],
-      messages: [
-        {
-          role: 'user',
-          content: userMessage,
         },
       ],
     },
